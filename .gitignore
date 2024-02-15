@@ -1,0 +1,32 @@
+server/node_modules/
+
+# Logs
+webapp/logs
+webapp/*.log
+webapp/npm-debug.log*
+webapp/yarn-debug.log*
+webapp/yarn-error.log*
+webapp/pnpm-debug.log*
+webapp/lerna-debug.log*
+
+webapp/node_modules
+webapp/.DS_Store
+webapp/dist
+webapp/dist-ssr
+webapp/coverage
+webapp/*.local
+
+webapp/cypress/videos/
+webapp/cypress/screenshots/
+
+# Editor directories and files
+webapp/.vscode/*
+webapp/!.vscode/extensions.json
+webapp/.idea
+webapp/*.suo
+webapp/*.ntvs*
+webapp/*.njsproj
+webapp/*.sln
+webapp/*.sw?
+
+webapp/*.tsbuildinfo
