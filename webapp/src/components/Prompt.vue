@@ -27,7 +27,7 @@ const add = async () => {
     type="text"
     placeholder="to do..."
     size="large"
-    :style="{ fontSize: '24px', height: '64px', width: '40%' }"
+    :style="{ fontSize: '24px', height: '56px', width: '40%' }"
     @pressEnter="add"
   />
 </template>
