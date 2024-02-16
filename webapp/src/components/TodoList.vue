@@ -102,17 +102,22 @@ const onSearch = searchText => {
     }
   ).filter(
     description => {
-      if (description.value === getDescription(getTask(showingModal.value))) {
+      const showingTask = getTask(showingModal.value);
+      if (description.value === getDescription(showingTask)) {
         return false;
       }
-      for (const taskId of getTask(showingModal.value).requires) {
-        if (description.value === getDescription(getTask(taskId))) {
-          return false;
+      if ('requires' in showingTask) {
+        for (const taskId of showingTask.requires) {
+          if (description.value === getDescription(getTask(taskId))) {
+            return false;
+          }
         }
       }
-      for (const taskId of getTask(showingModal.value).required_by) {
-        if (description.value === getDescription(getTask(taskId))) {
-          return false;
+      if ('required_by' in showingTask) {
+        for (const taskId of showingTask.required_by) {
+          if (description.value === getDescription(getTask(taskId))) {
+            return false;
+          }
         }
       }
       return true;
@@ -186,24 +191,23 @@ const deleteTask = async (id) => {
             </Button>
           </Space>
         </template>
-        <h3>
-          {{ item.description }}
-        </h3>
-        <!--
-          <ListItemMeta
-            :title="item.description"
-          />
-        -->
+        <Space>
+          <h3>{{ item.description }}</h3>
+          <h3 style="color: #666;">#{{ item.id }}</h3>
+        </Space>
       </ListItem>
     </template>
   </List>
   <Modal
     v-model:open="displayModal"
-    :title="showingModal === null ? 'dependency' : getDescription(getTask(showingModal))"
     @ok="modalOk()"
     @cancel="modalCancel()"
   >
     <Space direction="vertical" style="width: 100%;">
+      <Space>
+        <h3 style="font-weight: bold;">{{ showingModal === null ? 'details' : getTask(showingModal).description }}</h3>
+        <h3 style="font-weight: bold; color: #666;">#{{ showingModal === null ? '' : getTask(showingModal).id }}</h3>
+      </Space>
       <AutoComplete
         v-model:value="modalValue"
         style="width: 100%;"
@@ -222,7 +226,7 @@ const deleteTask = async (id) => {
             :class="modalSelected === null ? 'rounded-corners' : 'rounded-corners hover-highlight'"
             :span="12"
           >
-            <h3 class="rounded-corners" style="font-weight: bold;">requires:</h3>
+            <h4 class="rounded-corners" style="font-weight: bold;">requires:</h4>
             <template
               v-if="showingModal !== null"
               v-for="taskId in getTask(showingModal).requires"
@@ -240,7 +244,7 @@ const deleteTask = async (id) => {
             :class="modalSelected === null ? 'rounded-corners' : 'rounded-corners hover-highlight'"
             :span="12"
           >
-            <h3 class="rounded-corners" style="font-weight: bold;">required by:</h3>
+            <h4 class="rounded-corners" style="font-weight: bold;">required by:</h4>
             <template
               v-if="showingModal !== null"
               v-for="taskId in getTask(showingModal).required_by"
