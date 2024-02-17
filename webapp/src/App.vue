@@ -35,8 +35,8 @@ const customTheme = {
 #scrollbar-hider {
   position: absolute;
   height: 100%;
-  width: 120%;
-  padding-right: 20%;
+  width: 125%;
+  padding-right: 25%;
   overflow-y: scroll;
 }
 

@@ -81,6 +81,7 @@ app.post(ep_add, (req, res) => {
   const task = {
     id: tasks.length,
     description: value.description,
+    finished: false,
     time_created: getTime(),
     time_finished: null,
     requirements: [],
@@ -107,16 +108,17 @@ app.post(ep_finish, (req, res) => {
   }
 
   const task = tasks[value.id]
-  if (task.time_finished !== null) {
-    const msg = 'task already finished';
+  if (task.finished) {
+    const msg = `task ${task.id} already finished`;
     err(ep, msg);
     return res.status(422).send(msg);
   }
 
   task.time_finished = getTime();
+  task.finished = true;
   save();
 
-  const msg = 'task finished';
+  const msg = `task ${task.id} finished`;
   log(ep, msg);
   res.status(200).send(msg);
 });
@@ -139,15 +141,15 @@ app.post(ep_delete, (req, res) => {
   }
 
   for (const requirement of task.requirements) {
-    requirement.dependents = requirement.dependents.filter(id => id !== task.id);
+    tasks[requirement].dependents = tasks[requirement].dependents.filter(id => id !== task.id);
   }
   for (const dependent of task.dependents) {
-    dependent.requirements = dependent.requirements.filter(id => id !== task.id);
+    tasks[dependent].requirements = tasks[dependent].requirements.filter(id => id !== task.id);
   }
   task.deleted = true;
   save();
 
-  const msg = 'task deleted';
+  const msg = `task ${task.id} deleted`;
   log(ep, msg);
   res.status(200).send(msg);
 });
@@ -164,8 +166,8 @@ app.post(ep_add_dependency, (req, res) => {
 
   const requirement = tasks[value.requirement];
   const dependent = tasks[value.dependent];
-  if (requirement.id in dependent.requirements) {
-    const msg = 'dependency already exists';
+  if (dependent.requirements.includes(requirement.id)) {
+    const msg = `dependency (${requirement.id}, ${dependent.id}) already exists`;
     err(ep, msg);
     return res.status(422).send(msg);
   }
@@ -174,7 +176,7 @@ app.post(ep_add_dependency, (req, res) => {
   dependent.requirements.push(requirement.id);
   save();
 
-  const msg = 'dependency added';
+  const msg = `dependency (${requirement.id}, ${dependent.id}) added`;
   log(ep, msg);
   res.status(200).send(msg);
 });
@@ -191,17 +193,17 @@ app.post(ep_delete_dependency, (req, res) => {
 
   const requirement = tasks[value.requirement];
   const dependent = tasks[value.dependent];
-  if (!(requirement.id in dependent.requirements)) {
-    const msg = 'dependency does not exist';
+  if (!dependent.requirements.includes(requirement.id)) {
+    const msg = `dependency (${requirement.id}, ${dependent.id}) does not exist`;
     err(ep, msg);
     return res.status(422).send(msg);
   }
 
-  requirement.dependents = requirement.dependents.filter(taskId => taskId !== dependent.id);
-  dependent.requirements = dependent.requirements.filter(taskId => taskId !== requirement.id);
+  requirement.dependents = requirement.dependents.filter(id => id !== dependent.id);
+  dependent.requirements = dependent.requirements.filter(id => id !== requirement.id);
   save();
 
-  const msg = 'dependency deleted';
+  const msg = `dependency (${requirement.id}, ${dependent.id}) deleted`;
   log(ep, msg);
   res.status(200).send(msg);
 });
@@ -214,7 +216,7 @@ app.get('/v1/tasks', (req, res) => {
     null,
     2
   );
-  log(ep, msg);
+  // log(ep, msg);
   res.send(msg);
 });
 

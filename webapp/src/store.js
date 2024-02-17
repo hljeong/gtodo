@@ -24,7 +24,17 @@ export default createStore({
       commit('setTasks', data);
     },
     async addTask({ commit }, task) {
-      commit('pushTask', task);
+      const dummyTask = {
+        id: null,
+        description: task.description,
+        finished: false,
+        time_created: null,
+        time_finished: null,
+        requirements: [],
+        dependents: [],
+        deleted: false,
+      };
+      commit('pushTask', dummyTask);
       await fetch('http://localhost:3000/v1/add', {
         method: 'POST',
         headers: {
