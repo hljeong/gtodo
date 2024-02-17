@@ -16,6 +16,8 @@ app.use((req, res, next) => {
 const ep_add = '/v1/add';
 const ep_finish = '/v1/finish';
 const ep_delete = '/v1/delete';
+const ep_add_dependency = '/v1/add_dependency';
+const ep_delete_dependency = '/v1/delete_dependency';
 const ep_tasks = '/v1/tasks';
 
 const file = 'data.txt';
@@ -30,7 +32,7 @@ if (fs.existsSync(file)) {
   });
 }
 const save = () => {
-  fs.writeFile(file, JSON.stringify(tasks), err => {
+  fs.writeFile(file, JSON.stringify(tasks, null, 2), err => {
     if (err) {
       console.error('error occurred when writing to file');
     }
@@ -39,24 +41,37 @@ const save = () => {
 
 const getTime = () => new Date().toLocaleString();
 
-const add_schema = Joi.object({
-  description: Joi.string().required()
-});
+const schema = {
+  [ep_add]: Joi.object({
+    description: Joi.string().required(),
+  }),
 
-const finish_schema = Joi.object({
-  id: Joi.number().integer().min(0).required()
-});
+  [ep_finish]: Joi.object({
+    id: Joi.number().integer().min(0).required(),
+  }),
 
-const delete_schema = Joi.object({
-  id: Joi.number().integer().min(0).required()
-});
+  [ep_delete]: Joi.object({
+    id: Joi.number().integer().min(0).required(),
+  }),
+
+  [ep_add_dependency]: Joi.object({
+    requirement: Joi.number().integer().min(0).required(),
+    dependent: Joi.number().integer().min(0).disallow(Joi.ref('requirement')).required(),
+  }),
+
+  [ep_delete_dependency]: Joi.object({
+    requirement: Joi.number().integer().min(0).required(),
+    dependent: Joi.number().integer().min(0).disallow(Joi.ref('requirement')).required(),
+  }),
+};
 
 const log = (endpoint, msg) => console.log(`${endpoint} @ ${getTime()}:\n${msg}\n`);
 const err = (endpoint, msg) => console.error(`${endpoint} @ ${getTime()}:\n${msg}\n`);
 
 app.post(ep_add, (req, res) => {
   const ep = ep_add;
-  const { error, value } = add_schema.validate(req.body);
+
+  const { error, value } = schema[ep].validate(req.body);
   if (error) {
     const msg = error.details.map(detail => detail.message).reduce((acc, msg) => acc ? acc + '\n' + msg : msg);
     err(ep, msg);
@@ -64,9 +79,13 @@ app.post(ep_add, (req, res) => {
   }
 
   const task = {
-    'id': tasks.length,
-    'description': value.description,
-    'time_created': getTime(),
+    id: tasks.length,
+    description: value.description,
+    time_created: getTime(),
+    time_finished: null,
+    requirements: [],
+    dependents: [],
+    deleted: false,
   };
 
   tasks.push(task);
@@ -79,7 +98,8 @@ app.post(ep_add, (req, res) => {
 
 app.post(ep_finish, (req, res) => {
   const ep = ep_finish;
-  const { error, value } = finish_schema.validate(req.body);
+
+  const { error, value } = schema[ep].validate(req.body);
   if (error) {
     const msg = error.details.map(detail => detail.message).reduce((acc, msg) => acc ? acc + '\n' + msg : msg);
     err(ep, msg);
@@ -87,7 +107,7 @@ app.post(ep_finish, (req, res) => {
   }
 
   const task = tasks[value.id]
-  if ('time_finished' in task) {
+  if (task.time_finished !== null) {
     const msg = 'task already finished';
     err(ep, msg);
     return res.status(422).send(msg);
@@ -103,7 +123,8 @@ app.post(ep_finish, (req, res) => {
 
 app.post(ep_delete, (req, res) => {
   const ep = ep_delete;
-  const { error, value } = delete_schema.validate(req.body);
+
+  const { error, value } = schema[ep].validate(req.body);
   if (error) {
     const msg = error.details.map(detail => detail.message).reduce((acc, msg) => acc ? acc + '\n' + msg : msg);
     err(ep, msg);
@@ -111,12 +132,18 @@ app.post(ep_delete, (req, res) => {
   }
 
   const task = tasks[value.id]
-  if ('deleted' in task) {
+  if (task.deleted) {
     const msg = 'task already deleted';
     err(ep, msg);
     return res.status(422).send(msg);
   }
 
+  for (const requirement of task.requirements) {
+    requirement.dependents = requirement.dependents.filter(id => id !== task.id);
+  }
+  for (const dependent of task.dependents) {
+    dependent.requirements = dependent.requirements.filter(id => id !== task.id);
+  }
   task.deleted = true;
   save();
 
@@ -125,10 +152,65 @@ app.post(ep_delete, (req, res) => {
   res.status(200).send(msg);
 });
 
+app.post(ep_add_dependency, (req, res) => {
+  const ep = ep_add_dependency;
+
+  const { error, value } = schema[ep].validate(req.body);
+  if (error) {
+    const msg = error.details.map(detail => detail.message).reduce((acc, msg) => acc ? acc + '\n' + msg : msg);
+    err(ep, msg);
+    return res.status(400).send(msg);
+  }
+
+  const requirement = tasks[value.requirement];
+  const dependent = tasks[value.dependent];
+  if (requirement.id in dependent.requirements) {
+    const msg = 'dependency already exists';
+    err(ep, msg);
+    return res.status(422).send(msg);
+  }
+
+  requirement.dependents.push(dependent.id);
+  dependent.requirements.push(requirement.id);
+  save();
+
+  const msg = 'dependency added';
+  log(ep, msg);
+  res.status(200).send(msg);
+});
+
+app.post(ep_delete_dependency, (req, res) => {
+  const ep = ep_delete_dependency;
+
+  const { error, value } = schema[ep].validate(req.body);
+  if (error) {
+    const msg = error.details.map(detail => detail.message).reduce((acc, msg) => acc ? acc + '\n' + msg : msg);
+    err(ep, msg);
+    return res.status(400).send(msg);
+  }
+
+  const requirement = tasks[value.requirement];
+  const dependent = tasks[value.dependent];
+  if (!(requirement.id in dependent.requirements)) {
+    const msg = 'dependency does not exist';
+    err(ep, msg);
+    return res.status(422).send(msg);
+  }
+
+  requirement.dependents = requirement.dependents.filter(taskId => taskId !== dependent.id);
+  dependent.requirements = dependent.requirements.filter(taskId => taskId !== requirement.id);
+  save();
+
+  const msg = 'dependency deleted';
+  log(ep, msg);
+  res.status(200).send(msg);
+});
+
 app.get('/v1/tasks', (req, res) => {
   const ep = ep_tasks;
+
   const msg = JSON.stringify(
-    tasks.filter(task => !('deleted' in task)),
+    tasks.filter(task => !task.deleted),
     null,
     2
   );
