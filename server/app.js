@@ -72,6 +72,7 @@ const tags_schema = Joi.array().items(Joi.string()).unique();
 const schema = {
   [ep_add]: Joi.object({
     description: description_schema.required(),
+    tags: tags_schema,
   }),
 
   [ep_finish]: Joi.object({
@@ -140,7 +141,7 @@ app.post(ep_add, (req, res) => {
   const { error, data } = validate(ep, req.body);
   if (error) return res.status(400).send(error);
 
-  const { description } = data;
+  const { description, tags } = data;
   const task = {
     id: tasks.length,
     description: description,
@@ -149,7 +150,7 @@ app.post(ep_add, (req, res) => {
     time_finished: null,
     requirements: [],
     dependents: [],
-    tags: [],
+    tags: tags ? tags : [],
     deleted: false,
   };
 
