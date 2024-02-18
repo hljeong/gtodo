@@ -29,7 +29,7 @@ if (fs.existsSync(file)) {
       return
     }
     tasks.push(...JSON.parse(data));
-    for (const task : tasks) {
+    for (const task of tasks) {
       if (!('id' in task))
         task.id = -1;
       if (!('description' in task))
