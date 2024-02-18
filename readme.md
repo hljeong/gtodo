@@ -28,9 +28,7 @@ web app is hosted at `http://localhost:5173`.
 - server
   - create backups on a timer
 - webapp
-  - make todo descriptions editable
-  - add update api
-  - migrate api usage
+  - migrate api usage to use update
   - add filters
   - add unfinish
   - add undo

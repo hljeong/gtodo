@@ -34,6 +34,7 @@ const ep_add_dependency = 'http://localhost:3000/v1/add_dependency';
 const ep_delete_dependency = 'http://localhost:3000/v1/delete_dependency';
 const ep_add_tag = 'http://localhost:3000/v1/add_tag';
 const ep_delete_tag = 'http://localhost:3000/v1/delete_tag';
+const ep_update = 'http://localhost:3000/v1/update';
 
 const allTasks = ref([]);
 const taskIndex = ref({});
@@ -47,10 +48,13 @@ const promptInput = ref('');
 const displayModal = ref(false);
 const modalId = ref(null);
 
+const editDescription = ref(false);
+const editDescriptionInput = ref(null);
+const editDescriptionValue = ref('');
+
 const allTags = ref([]);
 const addTagOptions = ref([]);
 const addTagValue = ref('');
-const addTagInput = ref(null);
 
 const requirements = ref([]);
 const addRequirementOptions = ref([]);
@@ -165,6 +169,9 @@ onMounted(() => {
 const showModal = (id) => {
   const task = getTask(id);
 
+  editDescription.value = false;
+  editDescriptionValue.value = task.description;
+
   addTagValue.value = '';
 
   requirements.value = task.requirements;
@@ -179,14 +186,26 @@ const showModal = (id) => {
   displayModal.value = true;
 };
 
-const modalOk = id => {
-  addRequirementOptions.value = [];
-  addRequirementValue.value = '';
+const updateTask = async (id, update) => post(ep_update, { id: id, ...update });
 
-  addDependentOptions.value = [];
-  addDependentValue.value = '';
+const onModalDescriptionClick = async () => {
+  editDescriptionValue.value = getTask(modalId.value).description;
+  editDescription.value = true;
+  await nextTick();
+  editDescriptionInput.value.select();
+};
 
-  displayModal.value = false;
+const onEditDescriptionPressEnter = () => {
+  const task = getTask(modalId.value);
+  if (editDescriptionValue.value === '') {
+    editDescription.value = false;
+    editDescriptionValue.value = task.description;
+  }
+  task.description = editDescriptionValue.value;
+  updateTask(modalId.value, { description: editDescriptionValue.value })
+    .then(fetchTasks);
+  
+  editDescription.value = false;
 };
 
 const addTag = async (id, tag) => {
@@ -428,22 +447,22 @@ const deleteTask = async id => {
       style="width: 65%;"
       :split="false"
     >
-      <template #renderItem="{ item }">
+      <template #renderItem="{ item: task }">
         <ListItem class="child-show-on-hover rounded-corners hover-highlight">
           <Space>
             <check-outlined
               class="show-on-hover clickable-icon"
               style="font-size: 1.25rem; padding-top: 4px;"
-              @click="finishTask(item.id)"
+              @click="finishTask(task.id)"
             />
 
             <p style="font-size: 1.25rem;">
-              <span>{{ item.description }}</span>
-              <span style="color: #666;"> #{{ item.id }}</span>
+              <span>{{ task.description }}</span>
+              <span style="color: #666;"> #{{ task.id }}</span>
             </p>
 
             <Space :size="0">
-              <Tag v-for="tag of item.tags">
+              <Tag v-for="tag of task.tags">
                 {{ tag }}
               </Tag>
             </Space>
@@ -453,12 +472,12 @@ const deleteTask = async id => {
             <form-outlined
               class="show-on-hover clickable-icon"
               style="font-size: 1.25rem; padding-top: 4px;"
-              @click="showModal(item.id)"
+              @click="showModal(task.id)"
             />
             <close-outlined
               class="show-on-hover clickable-icon"
               style="font-size: 1.25rem; padding-top: 4px;"
-              @click="deleteTask(item.id)"
+              @click="deleteTask(task.id)"
             />
           </Space>
         </ListItem>
@@ -482,7 +501,7 @@ const deleteTask = async id => {
         style="width: 65%;"
         :split="false"
       >
-        <template #renderItem="{ item }">
+        <template #renderItem="{ item: task }">
           <ListItem class="child-show-on-hover rounded-corners hover-highlight">
             <Space>
               <check-outlined
@@ -491,12 +510,12 @@ const deleteTask = async id => {
               />
 
               <p style="font-size: 1.25rem;">
-                <span>{{ item.description }}</span>
-                <span style="color: #666;"> #{{ item.id }}</span>
+                <span>{{ task.description }}</span>
+                <span style="color: #666;"> #{{ task.id }}</span>
               </p>
 
               <Space :size="0">
-                <Tag v-for="tag of item.tags">
+                <Tag v-for="tag of task.tags">
                   {{ tag }}
                 </Tag>
               </Space>
@@ -506,12 +525,12 @@ const deleteTask = async id => {
               <form-outlined
                 class="show-on-hover clickable-icon"
                 style="font-size: 1.25rem; padding-top: 4px;"
-                @click="showModal(item.id)"
+                @click="showModal(task.id)"
               />
               <close-outlined
                 class="show-on-hover clickable-icon"
                 style="font-size: 1.25rem; padding-top: 4px;"
-                @click="deleteTask(item.id)"
+                @click="deleteTask(task.id)"
               />
             </Space>
           </ListItem>
@@ -536,7 +555,7 @@ const deleteTask = async id => {
         style="width: 65%;"
         :split="false"
       >
-        <template #renderItem="{ item }">
+        <template #renderItem="{ item: task }">
           <ListItem class="child-show-on-hover rounded-corners hover-highlight">
             <Space>
               <check-outlined
@@ -544,12 +563,12 @@ const deleteTask = async id => {
               />
 
               <p style="font-size: 1.25rem;">
-                <span>{{ item.description }}</span>
-                <span style="color: #666;"> #{{ item.id }}</span>
+                <span>{{ task.description }}</span>
+                <span style="color: #666;"> #{{ task.id }}</span>
               </p>
 
               <Space :size="0">
-                <Tag v-for="tag of item.tags">
+                <Tag v-for="tag of task.tags">
                   {{ tag }}
                 </Tag>
               </Space>
@@ -559,7 +578,7 @@ const deleteTask = async id => {
               <close-outlined
                 class="show-on-hover clickable-icon"
                 style="font-size: 1.25rem; padding-top: 4px;"
-                @click="deleteTask(item.id)"
+                @click="deleteTask(task.id)"
               />
             </Space>
           </ListItem>
@@ -570,14 +589,41 @@ const deleteTask = async id => {
     <Modal
       v-if="modalId !== null && modalId.value !== null"
       v-model:open="displayModal"
-      @ok="modalOk(modalId)"
     >
       <Space direction="vertical" style="width: 100%;">
-        <Space>
-          <h3>
-            <span style="font-weight: bold;">{{ getTask(modalId).description }}</span>
-            <span style="font-weight: bold; color: #666;"> #{{ getTask(modalId).id }}</span>
-          </h3>
+        <Space size="small">
+          <Input
+            ref="editDescriptionInput"
+            v-if="editDescription"
+            v-model:value="editDescriptionValue"
+            class="rounded-corners"
+            :bordered="false"
+            style="
+              padding: 0px;
+              font-family: Poppins;
+              font-weight: bold;
+              font-size: 20px;
+              width: 450px;
+            "
+            @pressEnter="onEditDescriptionPressEnter"
+          />
+          <span
+            v-else
+            style="font-weight: bold; font-size: 20px;"
+            @click="onModalDescriptionClick()"
+          >
+            {{ getTask(modalId).description }}
+          </span>
+          <span
+            :class="editDescription ? 'hide' : 'smooth-show'"
+            style="
+              font-weight: bold;
+              font-size: 20px;
+              color: #666;
+            "
+          >
+              {{ ` #${getTask(modalId).id}` }}
+          </span>
         </Space>
 
         <Space
@@ -611,7 +657,6 @@ const deleteTask = async id => {
               </template>
 
               <AutoComplete
-                ref="addTagInput"
                 v-model:value="addTagValue"
                 style="margin-left: -10px; width: 80px"
                 :options="addTagOptions"
@@ -731,13 +776,6 @@ const deleteTask = async id => {
       </Space>
 
       <template #footer>
-        <Button
-          key="ok"
-          type="primary"
-          @click="modalOk(modalId)"
-        >
-          OK
-        </Button>
       </template>
     </Modal>
   </div>
@@ -830,6 +868,11 @@ const deleteTask = async id => {
 
 .hide {
   opacity: 0%;
+}
+
+.smooth-show {
+  opacity: 100%;
+  transition: opacity 0.5s ease;
 }
 
 .show-on-hover {

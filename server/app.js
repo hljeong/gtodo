@@ -21,6 +21,7 @@ const ep_add_dependency = '/v1/add_dependency';
 const ep_delete_dependency = '/v1/delete_dependency';
 const ep_add_tag = '/v1/add_tag';
 const ep_delete_tag = '/v1/delete_tag';
+const ep_update = '/v1/update';
 
 const file = 'data.json';
 const tasks = [];
@@ -63,37 +64,48 @@ const save = () => {
 
 const getTime = () => new Date().toLocaleString();
 
+const id_schema = Joi.number().integer().min(0);
+const description_schema = Joi.string();
+const tag_schema = Joi.string();
+const tags_schema = Joi.array().items(Joi.string()).unique();
+
 const schema = {
   [ep_add]: Joi.object({
-    description: Joi.string().required(),
+    description: description_schema.required(),
   }),
 
   [ep_finish]: Joi.object({
-    id: Joi.number().integer().min(0).required(),
+    id: id_schema.required(),
   }),
 
   [ep_delete]: Joi.object({
-    id: Joi.number().integer().min(0).required(),
+    id: id_schema.required(),
   }),
 
   [ep_add_dependency]: Joi.object({
-    requirement: Joi.number().integer().min(0).required(),
-    dependent: Joi.number().integer().min(0).disallow(Joi.ref('requirement')).required(),
+    requirement: id_schema.required(),
+    dependent: id_schema.disallow(Joi.ref('requirement')).required(),
   }),
 
   [ep_delete_dependency]: Joi.object({
-    requirement: Joi.number().integer().min(0).required(),
-    dependent: Joi.number().integer().min(0).disallow(Joi.ref('requirement')).required(),
+    requirement: id_schema.required(),
+    dependent: id_schema.disallow(Joi.ref('requirement')).required(),
   }),
 
   [ep_add_tag]: Joi.object({
-    id: Joi.number().integer().min(0).required(),
+    id: id_schema.required(),
     tag: Joi.string().required(),
   }),
 
   [ep_delete_tag]: Joi.object({
-    id: Joi.number().integer().min(0).required(),
-    tag: Joi.string().required(),
+    id: id_schema.required(),
+    tag: tag_schema.required(),
+  }),
+
+  [ep_update]: Joi.object({
+    id: id_schema.required(),
+    description: description_schema,
+    tags: tags_schema,
   }),
 };
 
@@ -290,6 +302,27 @@ app.post(ep_delete_tag, (req, res) => {
   save();
 
   const msg = `deleted tag ${tag} from task #${id}`;
+  log(ep, msg);
+  res.status(200).send(msg);
+});
+
+app.post(ep_update, (req, res) => {
+  const ep = ep_update;
+
+  const { error, data } = validate(ep, req.body);
+  if (error) return res.status(400).send(error);
+
+  const { id, description, tags } = data;
+  const task = tasks.filter(task => task.id === id)[0];
+  if (description) {
+    task.description = description;
+  }
+  if (tags) {
+    task.tags = tags;
+  }
+  save();
+
+  const msg = `updated task #${id}`;
   log(ep, msg);
   res.status(200).send(msg);
 });
