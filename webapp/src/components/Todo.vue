@@ -32,6 +32,8 @@ const ep_finish = 'http://localhost:3000/v1/finish';
 const ep_delete = 'http://localhost:3000/v1/delete';
 const ep_add_dependency = 'http://localhost:3000/v1/add_dependency';
 const ep_delete_dependency = 'http://localhost:3000/v1/delete_dependency';
+const ep_add_tag = 'http://localhost:3000/v1/add_tag';
+const ep_delete_tag = 'http://localhost:3000/v1/delete_tag';
 
 const allTasks = ref([]);
 const taskIndex = ref({});
@@ -46,6 +48,7 @@ const displayModal = ref(false);
 const modalId = ref(null);
 
 const allTags = ref([]);
+const addTagOptions = ref([]);
 const addTagValue = ref('');
 const addTagInput = ref(null);
 
@@ -93,7 +96,7 @@ const updateTasks = () => {
   );
 
   unfinishedTasks.value = allTasks.value.filter(
-    task => !finishedTasks.value.includes(task)
+    task => !task.finished
   );
 
   blockedTasks.value = unfinishedTasks.value.filter(
@@ -110,9 +113,16 @@ const updateTasks = () => {
 const updateAllTags = () => {
   const allTagsRaw = [
     ...new Set(
-      [].concat(...unfinishedTasks.value)
+      [].concat(
+        ...unfinishedTasks.value.map(
+          task => task.tags
+        )
+      )
     )
   ];
+  allTags.value = allTagsRaw.map(tag => {
+    return { value: tag };
+  });
 };
 
 const fetchTasks = async () => {
@@ -169,7 +179,7 @@ const showModal = (id) => {
   displayModal.value = true;
 };
 
-const modalOk = (id) => {
+const modalOk = id => {
   addRequirementOptions.value = [];
   addRequirementValue.value = '';
 
@@ -177,7 +187,29 @@ const modalOk = (id) => {
   addDependentValue.value = '';
 
   displayModal.value = false;
-}
+};
+
+const addTag = async (id, tag) => {
+  const task = getTask(id);
+  if (!task.tags.includes(tag)) {
+    task.tags.push(tag);
+  }
+  post(ep_add_tag, { id: id, tag: tag })
+    .then(fetchTasks);
+};
+
+const deleteTag = async (id, tag) => {
+  const task = getTask(id);
+  task.tags = task.tags.filter(task_tag => task_tag !== tag);
+  post(ep_delete_tag, { id: id, tag: tag })
+    .then(fetchTasks);
+};
+
+const onAddTagPressEnter = () => {
+  if (addTagValue.value === '') return;
+  addTag(modalId.value, addTagValue.value);
+  addTagValue.value = '';
+};
 
 const getTaskFromDescriptionWithId = description => {
   const descriptionSplit = description.split('#');
@@ -186,6 +218,19 @@ const getTaskFromDescriptionWithId = description => {
 };
 
 const getDescriptionWithId = task => `${task.description} #${task.id}`;
+
+const onAddTagSearch = searchText => {
+  if (searchText === '') {
+    addTagOptions.value = [];
+    return;
+  }
+  addTagOptions.value = allTags.value.filter(tag => tag.value.startsWith(searchText));
+};
+
+const onAddTagSelect = (value, option) => {
+  addTag(modalId.value, value);
+  addTagValue.value = '';
+};
 
 const onAddRequirementSearch = searchText => {
   if (searchText === '') {
@@ -397,9 +442,11 @@ const deleteTask = async id => {
               <span style="color: #666;"> #{{ item.id }}</span>
             </p>
 
-            <Tag v-for="tag of item.tags">
-              {{ tag }}
-            </Tag>
+            <Space :size="0">
+              <Tag v-for="tag of item.tags">
+                {{ tag }}
+              </Tag>
+            </Space>
           </Space>
 
           <Space style="float: right;">
@@ -448,9 +495,11 @@ const deleteTask = async id => {
                 <span style="color: #666;"> #{{ item.id }}</span>
               </p>
 
-              <Tag v-for="tag of item.tags">
-                {{ tag }}
-              </Tag>
+              <Space :size="0">
+                <Tag v-for="tag of item.tags">
+                  {{ tag }}
+                </Tag>
+              </Space>
             </Space>
 
             <Space style="float: right;">
@@ -499,9 +548,11 @@ const deleteTask = async id => {
                 <span style="color: #666;"> #{{ item.id }}</span>
               </p>
 
-              <Tag v-for="tag of item.tags">
-                {{ tag }}
-              </Tag>
+              <Space :size="0">
+                <Tag v-for="tag of item.tags">
+                  {{ tag }}
+                </Tag>
+              </Space>
             </Space>
 
             <Space style="float: right;">
@@ -519,7 +570,7 @@ const deleteTask = async id => {
     <Modal
       v-if="modalId !== null && modalId.value !== null"
       v-model:open="displayModal"
-      @ok="modalOk()"
+      @ok="modalOk(modalId)"
     >
       <Space direction="vertical" style="width: 100%;">
         <Space>
@@ -540,23 +591,40 @@ const deleteTask = async id => {
 
           <Space
             class="rounded-corners"
+            :size="[0, 8]"
             :wrap="true"
           >
-            <Tag v-for="tag of getTask(modalId).tags">{{ tag }}</Tag>
+            <Tag v-for="tag of getTask(modalId).tags">
+              <template #icon>
+                <close-outlined
+                  class="hover-highlight close"
+                  style="font-size: 10px;"
+                  @click="deleteTag(modalId, tag)"
+                />
+              </template>
+
+              <span style="margin-left: -4px;">{{ tag }}</span>
+            </Tag>
             <Tag>
               <template #icon>
-                <plus-outlined />
+                <plus-outlined style="font-size: 12px;" />
               </template>
 
               <AutoComplete
                 ref="addTagInput"
                 v-model:value="addTagValue"
-                :options="allTags"
+                style="margin-left: -10px; width: 80px"
+                :options="addTagOptions"
+                :defaultActiveFirstOption="false"
+                @search="onAddTagSearch"
+                @select="onAddTagSelect"
               >
                 <Input
-                  class="rounded-corners"
                   :bordered="false"
                   placeholder="add tag..."
+                  size="small"
+                  style="font-size: 14px;"
+                  @pressEnter="onAddTagPressEnter"
                 />
               </AutoComplete>
             </Tag>
@@ -589,7 +657,7 @@ const deleteTask = async id => {
                 <close-outlined
                   class="show-on-hover close"
                   style="float: right;"
-                  @click="() => onDeleteRequirementClick(taskId)"
+                  @click="onDeleteRequirementClick(taskId)"
                 />
               </div>
             </div>
@@ -638,7 +706,7 @@ const deleteTask = async id => {
                 <close-outlined
                   class="show-on-hover close"
                   style="float: right;"
-                  @click="() => onDeleteDependentClick(taskId)"
+                  @click="onDeleteDependentClick(taskId)"
                 />
               </div>
             </div>
@@ -666,7 +734,7 @@ const deleteTask = async id => {
         <Button
           key="ok"
           type="primary"
-          @click="modalOk"
+          @click="modalOk(modalId)"
         >
           OK
         </Button>

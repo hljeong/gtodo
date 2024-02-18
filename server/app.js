@@ -13,12 +13,14 @@ app.use((req, res, next) => {
   next();
 });
 
+const ep_tasks = '/v1/tasks';
 const ep_add = '/v1/add';
 const ep_finish = '/v1/finish';
 const ep_delete = '/v1/delete';
 const ep_add_dependency = '/v1/add_dependency';
 const ep_delete_dependency = '/v1/delete_dependency';
-const ep_tasks = '/v1/tasks';
+const ep_add_tag = '/v1/add_tag';
+const ep_delete_tag = '/v1/delete_tag';
 
 const file = 'data.json';
 const tasks = [];
@@ -83,24 +85,53 @@ const schema = {
     requirement: Joi.number().integer().min(0).required(),
     dependent: Joi.number().integer().min(0).disallow(Joi.ref('requirement')).required(),
   }),
+
+  [ep_add_tag]: Joi.object({
+    id: Joi.number().integer().min(0).required(),
+    tag: Joi.string().required(),
+  }),
+
+  [ep_delete_tag]: Joi.object({
+    id: Joi.number().integer().min(0).required(),
+    tag: Joi.string().required(),
+  }),
 };
 
 const log = (endpoint, msg) => console.log(`${endpoint} @ ${getTime()}:\n${msg}\n`);
 const err = (endpoint, msg) => console.error(`${endpoint} @ ${getTime()}:\n${msg}\n`);
 
+const validate = (endpoint, data) => {
+  const { error, value } = schema[endpoint].validate(data);
+  if (error) {
+    const msg = error.details.map(detail => detail.message).reduce((acc, msg) => acc ? acc + '\n' + msg : msg);
+    err(endpoint, msg);
+    return { error: msg };
+  }
+  return { data: value };
+};
+
+app.get(ep_tasks, (req, res) => {
+  const ep = ep_tasks;
+
+  const msg = JSON.stringify(
+    tasks.filter(task => !task.deleted),
+    null,
+    2
+  );
+  // log(ep, msg);
+  res.send(msg);
+});
+
 app.post(ep_add, (req, res) => {
   const ep = ep_add;
 
-  const { error, value } = schema[ep].validate(req.body);
-  if (error) {
-    const msg = error.details.map(detail => detail.message).reduce((acc, msg) => acc ? acc + '\n' + msg : msg);
-    err(ep, msg);
-    return res.status(400).send(msg);
-  }
+  const { error, data } = validate(ep, req.body);
+  if (error) return res.status(400).send(error);
 
+  const { description } = data;
   const task = {
     id: tasks.length,
-    description: value.description,
+    description: description,
     finished: false,
     time_created: getTime(),
     time_finished: null,
@@ -121,16 +152,13 @@ app.post(ep_add, (req, res) => {
 app.post(ep_finish, (req, res) => {
   const ep = ep_finish;
 
-  const { error, value } = schema[ep].validate(req.body);
-  if (error) {
-    const msg = error.details.map(detail => detail.message).reduce((acc, msg) => acc ? acc + '\n' + msg : msg);
-    err(ep, msg);
-    return res.status(400).send(msg);
-  }
+  const { error, data } = validate(ep, req.body);
+  if (error) return res.status(400).send(error);
 
-  const task = tasks[value.id]
+  const { id } = data;
+  const task = tasks[id];
   if (task.finished) {
-    const msg = `task ${task.id} already finished`;
+    const msg = `task #${task.id} already finished`;
     err(ep, msg);
     return res.status(422).send(msg);
   }
@@ -139,7 +167,7 @@ app.post(ep_finish, (req, res) => {
   task.finished = true;
   save();
 
-  const msg = `task ${task.id} finished`;
+  const msg = `task #${task.id} finished`;
   log(ep, msg);
   res.status(200).send(msg);
 });
@@ -147,14 +175,11 @@ app.post(ep_finish, (req, res) => {
 app.post(ep_delete, (req, res) => {
   const ep = ep_delete;
 
-  const { error, value } = schema[ep].validate(req.body);
-  if (error) {
-    const msg = error.details.map(detail => detail.message).reduce((acc, msg) => acc ? acc + '\n' + msg : msg);
-    err(ep, msg);
-    return res.status(400).send(msg);
-  }
+  const { error, data } = validate(ep, req.body);
+  if (error) return res.status(400).send(error);
 
-  const task = tasks[value.id]
+  const { id } = data;
+  const task = tasks[id];
   if (task.deleted) {
     const msg = 'task already deleted';
     err(ep, msg);
@@ -170,7 +195,7 @@ app.post(ep_delete, (req, res) => {
   task.deleted = true;
   save();
 
-  const msg = `task ${task.id} deleted`;
+  const msg = `task #${task.id} deleted`;
   log(ep, msg);
   res.status(200).send(msg);
 });
@@ -178,15 +203,15 @@ app.post(ep_delete, (req, res) => {
 app.post(ep_add_dependency, (req, res) => {
   const ep = ep_add_dependency;
 
-  const { error, value } = schema[ep].validate(req.body);
-  if (error) {
-    const msg = error.details.map(detail => detail.message).reduce((acc, msg) => acc ? acc + '\n' + msg : msg);
-    err(ep, msg);
-    return res.status(400).send(msg);
-  }
+  const { error, data } = validate(ep, req.body);
+  if (error) return res.status(400).send(error);
 
-  const requirement = tasks[value.requirement];
-  const dependent = tasks[value.dependent];
+  const {
+    requirement: requirementId,
+    dependent: dependentId
+  } = data;
+  const requirement = tasks[requirementId];
+  const dependent = tasks[dependentId];
   if (dependent.requirements.includes(requirement.id)) {
     const msg = `dependency (${requirement.id}, ${dependent.id}) already exists`;
     err(ep, msg);
@@ -205,17 +230,17 @@ app.post(ep_add_dependency, (req, res) => {
 app.post(ep_delete_dependency, (req, res) => {
   const ep = ep_delete_dependency;
 
-  const { error, value } = schema[ep].validate(req.body);
-  if (error) {
-    const msg = error.details.map(detail => detail.message).reduce((acc, msg) => acc ? acc + '\n' + msg : msg);
-    err(ep, msg);
-    return res.status(400).send(msg);
-  }
+  const { error, data } = validate(ep, req.body);
+  if (error) return res.status(400).send(error);
 
-  const requirement = tasks[value.requirement];
-  const dependent = tasks[value.dependent];
+  const {
+    requirement: requirementId,
+    dependent: dependentId
+  } = data;
+  const requirement = tasks[requirementId];
+  const dependent = tasks[dependentId];
   if (!dependent.requirements.includes(requirement.id)) {
-    const msg = `dependency (${requirement.id}, ${dependent.id}) does not exist`;
+    const msg = `dependency (#${requirement.id}, #${dependent.id}) does not exist`;
     err(ep, msg);
     return res.status(422).send(msg);
   }
@@ -229,16 +254,44 @@ app.post(ep_delete_dependency, (req, res) => {
   res.status(200).send(msg);
 });
 
-app.get('/v1/tasks', (req, res) => {
-  const ep = ep_tasks;
+app.post(ep_add_tag, (req, res) => {
+  const ep = ep_add_tag;
 
-  const msg = JSON.stringify(
-    tasks.filter(task => !task.deleted),
-    null,
-    2
-  );
-  // log(ep, msg);
-  res.send(msg);
+  const { error, data } = validate(ep, req.body);
+  if (error) return res.status(400).send(error);
+
+  const { id, tag } = data;
+  const task = tasks.filter(task => task.id === id)[0];
+  if (!task.tags.includes(tag)) {
+    task.tags.push(tag);
+  }
+  save();
+
+  const msg = `added tag ${tag} to task #${id}`;
+  log(ep, msg);
+  res.status(200).send(msg);
+});
+
+app.post(ep_delete_tag, (req, res) => {
+  const ep = ep_add_tag;
+
+  const { error, data } = validate(ep, req.body);
+  if (error) return res.status(400).send(error);
+
+  const { id, tag } = data;
+  const task = tasks.filter(task => task.id === id)[0];
+  if (!task.tags.includes(tag)) {
+    const msg = `task #${id} does not have tag ${tag}`;
+    err(ep, msg);
+    return res.status(422).send(msg);
+  }
+
+  task.tags = task.tags.filter(task_tag => task_tag !== tag);
+  save();
+
+  const msg = `deleted tag ${tag} from task #${id}`;
+  log(ep, msg);
+  res.status(200).send(msg);
 });
 
 app.listen(port, () => {
