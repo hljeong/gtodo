@@ -30,7 +30,6 @@ web app is hosted at `http://localhost:5173`.
   - create backups on a timer
 - webapp
   - migrate api usage to use update
-  - add filters
   - add unfinish
   - add undo
   - add hotkeys
