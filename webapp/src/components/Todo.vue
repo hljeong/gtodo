@@ -53,6 +53,7 @@ const editDescriptionInput = ref(null);
 const editDescriptionValue = ref('');
 
 const allTags = ref([]);
+const allTagOptions = ref([]);
 const addTagOptions = ref([]);
 const addTagValue = ref('');
 
@@ -116,7 +117,7 @@ const updateTasks = () => {
 };
 
 const updateAllTags = () => {
-  const allTagsRaw = [
+  allTags.value = [
     ...new Set(
       [].concat(
         ...unfinishedTasks.value.map(
@@ -125,7 +126,7 @@ const updateAllTags = () => {
       )
     )
   ];
-  allTags.value = allTagsRaw.map(tag => {
+  allTagOptions.value = allTags.value.map(tag => {
     return { value: tag };
   });
 };
@@ -174,7 +175,7 @@ const showModal = (id) => {
   editDescriptionValue.value = task.description;
 
   addTagValue.value = '';
-  addTagOptions.value = allTags.value;
+  addTagOptions.value = allTagOptions.value;
 
   requirements.value = task.requirements;
   addRequirementOptions.value = [];
@@ -245,7 +246,7 @@ const onAddTagSearch = searchText => {
     addTagOptions.value = [];
     return;
   }
-  addTagOptions.value = allTags.value.filter(tag => tag.value.startsWith(searchText));
+  addTagOptions.value = allTagOptions.value.filter(tag => tag.value.startsWith(searchText));
 };
 
 const onAddTagSelect = (value, option) => {
@@ -695,7 +696,7 @@ const deleteTask = async id => {
 
               <AutoComplete
                 v-model:value="addTagValue"
-                style="margin-left: -10px; width: 160px"
+                style="margin-left: -10px;"
                 :options="addTagOptions"
                 :defaultActiveFirstOption="false"
                 @search="onAddTagSearch"
@@ -705,7 +706,7 @@ const deleteTask = async id => {
                   :bordered="false"
                   placeholder="add tag..."
                   size="small"
-                  style="font-size: 14px;"
+                  style="font-size: 14px; width: 160px"
                   @pressEnter="onAddTagPressEnter"
                 />
               </AutoComplete>
