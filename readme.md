@@ -25,6 +25,7 @@ npm run serve
 web app is hosted at `http://localhost:5173`.
 
 ## todo
+- list technologies in readme
 - server
   - create backups on a timer
 - webapp
@@ -35,7 +36,6 @@ web app is hosted at `http://localhost:5173`.
   - add hotkeys
   - add composition
   - make lists (main list and dependency lists) draggable
-  - list technologies in readme
   - add transitions for adding and deleting items
   - add transitions for updating displayed tasks
   - modularize

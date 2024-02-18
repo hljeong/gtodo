@@ -68,6 +68,7 @@ const addDependentInput = ref(null);
 
 const showBlocked = ref(false);
 const showFinished = ref(false);
+const showTags = ref(true);
 
 const post = async (endpoint, data) => {
   return fetch(
@@ -173,6 +174,7 @@ const showModal = (id) => {
   editDescriptionValue.value = task.description;
 
   addTagValue.value = '';
+  addTagOptions.value = allTags.value;
 
   requirements.value = task.requirements;
   addRequirementOptions.value = [];
@@ -448,7 +450,13 @@ const deleteTask = async id => {
       :split="false"
     >
       <template #renderItem="{ item: task }">
-        <ListItem class="child-show-on-hover rounded-corners hover-highlight">
+        <ListItem
+          class="
+            child-show-on-hover
+            rounded-corners
+            hover-highlight
+          "
+        >
           <Space>
             <check-outlined
               class="show-on-hover clickable-icon"
@@ -461,7 +469,10 @@ const deleteTask = async id => {
               <span style="color: #666;"> #{{ task.id }}</span>
             </p>
 
-            <Space :size="0">
+            <Space
+              :class="showTags ? 'smooth-show' : 'smooth-hide'"
+              :size="0"
+            >
               <Tag v-for="tag of task.tags">
                 {{ tag }}
               </Tag>
@@ -484,14 +495,18 @@ const deleteTask = async id => {
       </template>
     </List>
 
-    <template
-      v-if="showBlocked"
-    >
+    <template v-if="showBlocked">
       <div style="height: 30px" />
 
       <p
         class="rounded-corners"
-        style="width: 65%; font-family: Poppins; font-weight: bold; font-size: 1.2rem; padding-left: 4px;"
+        style="
+          width: 65%;
+          font-family: Poppins;
+          font-weight: bold;
+          font-size: 1.2rem;
+          padding-left: 4px;
+        "
       >
         blocked tasks:
       </p>
@@ -502,7 +517,13 @@ const deleteTask = async id => {
         :split="false"
       >
         <template #renderItem="{ item: task }">
-          <ListItem class="child-show-on-hover rounded-corners hover-highlight">
+          <ListItem
+            class="
+              child-show-on-hover
+              rounded-corners
+              hover-highlight
+            "
+          >
             <Space>
               <check-outlined
                 class="hide"
@@ -514,7 +535,10 @@ const deleteTask = async id => {
                 <span style="color: #666;"> #{{ task.id }}</span>
               </p>
 
-              <Space :size="0">
+              <Space
+                :class="showTags ? 'smooth-show' : 'smooth-hide'"
+                :size="0"
+              >
                 <Tag v-for="tag of task.tags">
                   {{ tag }}
                 </Tag>
@@ -538,14 +562,18 @@ const deleteTask = async id => {
       </List>
     </template>
 
-    <template
-      v-if="showFinished"
-    >
+    <template v-if="showFinished">
       <div style="height: 30px" />
 
       <p
         class="rounded-corners"
-        style="width: 65%; font-family: Poppins; font-weight: bold; font-size: 1.2rem; padding-left: 4px;"
+        style="
+          width: 65%;
+          font-family: Poppins;
+          font-weight: bold;
+          font-size: 1.2rem;
+          padding-left: 4px;
+        "
       >
         finished tasks:
       </p>
@@ -556,7 +584,13 @@ const deleteTask = async id => {
         :split="false"
       >
         <template #renderItem="{ item: task }">
-          <ListItem class="child-show-on-hover rounded-corners hover-highlight">
+          <ListItem
+            class="
+              child-show-on-hover
+              rounded-corners
+              hover-highlight
+            "
+          >
             <Space>
               <check-outlined
                 style="font-size: 1.25rem; padding-top: 4px;"
@@ -567,7 +601,10 @@ const deleteTask = async id => {
                 <span style="color: #666;"> #{{ task.id }}</span>
               </p>
 
-              <Space :size="0">
+              <Space
+                :class="showTags ? 'smooth-show' : 'smooth-hide'"
+                :size="0"
+              >
                 <Tag v-for="tag of task.tags">
                   {{ tag }}
                 </Tag>
@@ -658,7 +695,7 @@ const deleteTask = async id => {
 
               <AutoComplete
                 v-model:value="addTagValue"
-                style="margin-left: -10px; width: 80px"
+                style="margin-left: -10px; width: 160px"
                 :options="addTagOptions"
                 :defaultActiveFirstOption="false"
                 @search="onAddTagSearch"
@@ -690,8 +727,16 @@ const deleteTask = async id => {
             v-for="taskId of requirements"
           >
             <div
-              class="child-show-on-hover rounded-corners hover-highlight"
-              style="width: 100%; display: flex; align-items: center;"
+              class="
+                child-show-on-hover
+                rounded-corners
+                hover-highlight
+              "
+              style="
+                width: 100%;
+                display: flex;
+                align-items: center;
+              "
             >
               <p>
                 <span>{{ getTask(taskId).description }}</span>
@@ -717,7 +762,11 @@ const deleteTask = async id => {
             @select="onAddRequirementSelect"
           >
             <Input
-              class="rounded-corners hover-highlight active-highlight"
+              class="
+                rounded-corners
+                hover-highlight
+                active-highlight
+              "
               :bordered="false"
               :allowClear="true"
               placeholder="add requirement..."
@@ -739,8 +788,16 @@ const deleteTask = async id => {
             v-for="taskId of dependents"
           >
             <div
-              class="child-show-on-hover rounded-corners hover-highlight"
-              style="width: 100%; display: flex; align-items: center;"
+              class="
+                child-show-on-hover
+                rounded-corners
+                hover-highlight
+              "
+              style="
+                width: 100%;
+                display: flex;
+                align-items: center;
+              "
             >
               <p>
                 <span>{{ getTask(taskId).description }}</span>
@@ -766,7 +823,11 @@ const deleteTask = async id => {
             @select="onAddDependentSelect"
           >
             <Input
-              class="rounded-corners hover-highlight active-highlight"
+              class="
+                rounded-corners
+                hover-highlight
+                active-highlight
+              "
               :bordered="false"
               :allowClear="true"
               placeholder="add dependent..."
@@ -779,15 +840,48 @@ const deleteTask = async id => {
       </template>
     </Modal>
   </div>
-  <div id="settings-panel" class="child-rotate-on-hover child-show-on-hover">
-    <Space direction="vertical" size="large">
+  <div
+    id="settings-panel"
+    class="
+      child-rotate-on-hover
+      child-show-on-hover
+    "
+  >
+    <Space
+      direction="vertical"
+      size="large"
+      align="end"
+    >
       <setting-outlined
         class="rotate-on-hover"
-        style="float: right; font-size: 36px; color: #444;"
+        style="
+          float: right;
+          font-size: 36px;
+          color: #444;
+        "
       />
 
       <Space class="show-on-hover-1">
-        <span style="font-family: Poppins; font-size: 16px;">
+        <span
+          style="
+            font-family: Poppins;
+            font-size: 16px;
+          "
+        >
+          show tags
+        </span>
+        <Switch
+          v-model:checked="showTags"
+        />
+      </Space>
+
+      <Space class="show-on-hover-2">
+        <span
+          style="
+            font-family: Poppins;
+            font-size: 16px;
+          "
+        >
           show blocked tasks
         </span>
         <Switch
@@ -795,8 +889,13 @@ const deleteTask = async id => {
         />
       </Space>
 
-      <Space class="show-on-hover-2">
-        <span style="font-family: Poppins; font-size: 16px;">
+      <Space class="show-on-hover-3">
+        <span
+          style="
+            font-family: Poppins;
+            font-size: 16px;
+          "
+        >
           show finished tasks
         </span>
         <Switch
@@ -870,6 +969,11 @@ const deleteTask = async id => {
   opacity: 0%;
 }
 
+.smooth-hide {
+  opacity: 0%;
+  transition: opacity 0.3s ease;
+}
+
 .smooth-show {
   opacity: 100%;
   transition: opacity 0.5s ease;
@@ -877,7 +981,7 @@ const deleteTask = async id => {
 
 .show-on-hover {
   opacity: 0%;
-  transition: opacity 0.3s ease;
+  transition: max-height 0.3s ease;
 }
 
 .child-show-on-hover:hover .show-on-hover {
@@ -887,7 +991,7 @@ const deleteTask = async id => {
 
 .show-on-hover-1 {
   opacity: 0%;
-  transition: opacity 0.6s ease;
+  transition: opacity 0.9s ease;
 }
 
 .child-show-on-hover:hover .show-on-hover-1 {
@@ -897,12 +1001,22 @@ const deleteTask = async id => {
 
 .show-on-hover-2 {
   opacity: 0%;
-  transition: opacity 0.3s ease;
+  transition: opacity 0.6s ease;
 }
 
 .child-show-on-hover:hover .show-on-hover-2 {
   opacity: 100%;
   transition: opacity 0.8s ease;
+}
+
+.show-on-hover-3 {
+  opacity: 0%;
+  transition: opacity 0.3s ease;
+}
+
+.child-show-on-hover:hover .show-on-hover-3 {
+  opacity: 100%;
+  transition: opacity 1.2s ease;
 }
 
 </style>
