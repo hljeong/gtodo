@@ -29,6 +29,7 @@ web app is hosted at `http://localhost:5173`.
   - create backups on a timer
 - webapp
   - add tags and filters
+  - add unfinish
   - add undo
   - add hotkeys
   - make lists (main list and dependency lists) draggable

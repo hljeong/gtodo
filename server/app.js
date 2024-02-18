@@ -40,12 +40,12 @@ if (fs.existsSync(file)) {
         task.time_created = null;
       if (!('time_finished' in task))
         task.time_finished = null;
+      if (!('tags' in task))
+        task.tags = [];
       if (!('requirements' in task))
         task.requirements = [];
       if (!('dependents' in task))
         task.dependents = [];
-      if (!('tags' in task))
-        task.tags = [];
       if (!('deleted' in task))
         task.deleted = false;
     }

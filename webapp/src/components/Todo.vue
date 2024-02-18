@@ -1,6 +1,5 @@
 <script setup>
 import { onMounted, ref, nextTick } from 'vue';
-import { useStore } from 'vuex';
 import {
   AutoComplete,
   Button,
@@ -15,30 +14,40 @@ import {
   Row,
   Space,
   Switch,
+  Tag,
   Tooltip,
 } from 'ant-design-vue';
 import {
   CheckOutlined,
   CloseOutlined,
   FormOutlined,
+  PlusOutlined,
   SettingOutlined,
 } from '@ant-design/icons-vue';
 
 
+const ep_tasks = 'http://localhost:3000/v1/tasks'
+const ep_add = 'http://localhost:3000/v1/add'
 const ep_finish = 'http://localhost:3000/v1/finish';
 const ep_delete = 'http://localhost:3000/v1/delete';
 const ep_add_dependency = 'http://localhost:3000/v1/add_dependency';
 const ep_delete_dependency = 'http://localhost:3000/v1/delete_dependency';
 
-const store = useStore();
-
-const tasks = ref([]);
-const displayedTasks = ref([]);
+const allTasks = ref([]);
+const taskIndex = ref({});
+const unfinishedTasks = ref([]);
+const activeTasks = ref([]);
+const blockedTasks = ref([]);
+const finishedTasks = ref([]);
 
 const promptInput = ref('');
 
 const displayModal = ref(false);
 const modalId = ref(null);
+
+const allTags = ref([]);
+const addTagValue = ref('');
+const addTagInput = ref(null);
 
 const requirements = ref([]);
 const addRequirementOptions = ref([]);
@@ -66,54 +75,87 @@ const post = async (endpoint, data) => {
   );
 };
 
-const add = async () => {
+const getTask = id => {
+  if (!(id in taskIndex.value)) throw new Error(`task #${id} does not exist`);
+  return taskIndex.value[id];
+};
+
+const indexTasks = () => {
+  taskIndex.value = {};
+  for (const task of allTasks.value) {
+    taskIndex.value[task.id] = task;
+  }
+};
+
+const updateTasks = () => {
+  finishedTasks.value = allTasks.value.filter(
+    task => task.finished
+  );
+
+  unfinishedTasks.value = allTasks.value.filter(
+    task => !finishedTasks.value.includes(task)
+  );
+
+  blockedTasks.value = unfinishedTasks.value.filter(
+    task => task.requirements.some(
+      requirement => !requirement.finished
+    )
+  );
+
+  activeTasks.value = unfinishedTasks.value.filter(
+    task => !blockedTasks.value.includes(task)
+  );
+};
+
+const updateAllTags = () => {
+  const allTagsRaw = [
+    ...new Set(
+      [].concat(...unfinishedTasks.value)
+    )
+  ];
+};
+
+const fetchTasks = async () => {
+  allTasks.value = await (await fetch(ep_tasks)).json();
+  indexTasks();
+  updateTasks();
+  updateAllTags();
+  if (modalId.value !== null) {
+    const task = getTask(modalId.value);
+    requirements.value = task.requirements;
+    dependents.value = task.dependents;
+  }
+};
+
+const addTask = async () => {
   if (promptInput.value === '') return;
 
-  const task = { description: promptInput.value };
-  store.dispatch('addTask', task)
-    .then(() => store.dispatch('getTasks'));
+  const dummyTask = {
+    id: null,
+    description: promptInput.value,
+    finished: false,
+    time_created: null,
+    time_finished: null,
+    tags: [],
+    requirements: [],
+    dependents: [],
+    deleted: false,
+  }
+  allTasks.value.push(dummyTask);
+  activeTasks.value.push(dummyTask);
+  post(ep_add, { description: promptInput.value })
+    .then(fetchTasks);
   promptInput.value = '';
 };
 
 onMounted(() => {
-  store.dispatch('getTasks');
+  fetchTasks();
 });
-
-const getTask = (id) => {
-  return tasks.value.filter(task => task.id === id)[0];
-};
-
-const updateDisplayedTasks = () => {
-  displayedTasks.value = tasks.value;
-  if (!showBlocked.value) {
-    displayedTasks.value = displayedTasks.value.filter(
-      task => task.requirements.every(
-        requirement => requirement.finished
-      )
-    );
-  }
-  if (!showFinished.value) {
-    displayedTasks.value = displayedTasks.value.filter(
-      task => !task.finished
-    );
-  }
-};
-
-store.watch(
-  () => store.getters.getTasks,
-  newTasks => {
-    tasks.value = newTasks;
-    updateDisplayedTasks();
-    if (modalId.value !== null) {
-      const task = getTask(modalId.value);
-      requirements.value = task.requirements;
-      dependents.value = task.dependents;
-    }
-  }
-);
 
 const showModal = (id) => {
   const task = getTask(id);
+
+  addTagValue.value = '';
 
   requirements.value = task.requirements;
   addRequirementOptions.value = [];
@@ -137,22 +179,22 @@ const modalOk = (id) => {
   displayModal.value = false;
 }
 
-const getTaskFromDescription = description => {
+const getTaskFromDescriptionWithId = description => {
   const descriptionSplit = description.split('#');
   const id = parseInt(descriptionSplit[descriptionSplit.length - 1]);
   return getTask(id);
 };
 
-const getDescription = (task) => `${task.description} #${task.id}`;
+const getDescriptionWithId = task => `${task.description} #${task.id}`;
 
 const onAddRequirementSearch = searchText => {
   if (searchText === '') {
     addRequirementOptions.value = [];
     return;
   }
-  const descriptions = tasks.value.map(task => {
+  const descriptions = unfinishedTasks.value.map(task => {
     return {
-      value: getDescription(task),
+      value: getDescriptionWithId(task),
     };
   });
   const searchSequence = searchText.trim().split(' ');
@@ -180,16 +222,16 @@ const onAddRequirementSearch = searchText => {
   ).filter(
     description => {
       const showingTask = getTask(modalId.value);
-      if (description.value === getDescription(showingTask)) {
+      if (description.value === getDescriptionWithId(showingTask)) {
         return false;
       }
       for (const taskId of showingTask.requirements) {
-        if (description.value === getDescription(getTask(taskId))) {
+        if (description.value === getDescriptionWithId(getTask(taskId))) {
           return false;
         }
       }
       for (const taskId of showingTask.dependents) {
-        if (description.value === getDescription(getTask(taskId))) {
+        if (description.value === getDescriptionWithId(getTask(taskId))) {
           return false;
         }
       }
@@ -204,9 +246,9 @@ const onAddDependentSearch = searchText => {
     addDependentOptions.value = [];
     return;
   }
-  const descriptions = tasks.value.map(task => {
+  const descriptions = unfinishedTasks.value.map(task => {
     return {
-      value: getDescription(task),
+      value: getDescriptionWithId(task),
     };
   });
   const searchSequence = searchText.trim().split(' ');
@@ -234,16 +276,16 @@ const onAddDependentSearch = searchText => {
   ).filter(
     description => {
       const showingTask = getTask(modalId.value);
-      if (description.value === getDescription(showingTask)) {
+      if (description.value === getDescriptionWithId(showingTask)) {
         return false;
       }
       for (const taskId of showingTask.requirements) {
-        if (description.value === getDescription(getTask(taskId))) {
+        if (description.value === getDescriptionWithId(getTask(taskId))) {
           return false;
         }
       }
       for (const taskId of showingTask.dependents) {
-        if (description.value === getDescription(getTask(taskId))) {
+        if (description.value === getDescriptionWithId(getTask(taskId))) {
           return false;
         }
       }
@@ -255,14 +297,14 @@ const onAddDependentSearch = searchText => {
 
 const onAddRequirementSelect = (value, option) => {
   if ('value' in option) {
-    const requirement = getTaskFromDescription(option.value);
+    const requirement = getTaskFromDescriptionWithId(option.value);
     post(
       ep_add_dependency,
       {
         requirement: requirement.id,
         dependent: modalId.value,
       }
-    ).then(() => store.dispatch('getTasks'));
+    ).then(fetchTasks);
     requirements.value.push(requirement.id);
   }
   addRequirementValue.value = '';
@@ -270,14 +312,14 @@ const onAddRequirementSelect = (value, option) => {
 
 const onAddDependentSelect = (value, option) => {
   if ('value' in option) {
-    const dependent = getTaskFromDescription(option.value);
+    const dependent = getTaskFromDescriptionWithId(option.value);
     post(
       ep_add_dependency,
       {
         requirement: modalId.value,
         dependent: dependent.id,
       }
-    ).then(() => store.dispatch('getTasks'));
+    ).then(fetchTasks);
     dependents.value.push(dependent.id);
   }
   addDependentValue.value = '';
@@ -290,7 +332,7 @@ const onDeleteRequirementClick = id => {
       requirement: id,
       dependent: modalId.value,
     }
-  ).then(() => store.dispatch('getTasks'));
+  ).then(fetchTasks);
   requirements.value = requirements.value.filter(taskId => taskId !== id);
 };
 
@@ -301,20 +343,26 @@ const onDeleteDependentClick = id => {
       requirement: modalId.value,
       dependent: id,
     }
-  ).then(() => store.dispatch('getTasks'));
+  ).then(fetchTasks);
   dependents.value = dependents.value.filter(taskId => taskId !== id);
 };
 
-const finish = async (id) => {
-  store.dispatch('removeTask', id);
+const finishTask = async (id) => {
+  allTasks.value = allTasks.value.filter(task => task.id !== id);
+  activeTasks.value = activeTasks.value.filter(task => task.id !== id);
+  finishedTasks.value.push(getTask(id));
   post(ep_finish, { id: id })
-    .then(() => store.dispatch('getTasks'));
+    .then(fetchTasks);
 };
 
-const deleteTask = async (id) => {
-  store.dispatch('removeTask', id);
+const deleteTask = async id => {
+  allTasks.value = allTasks.value.filter(task => task.id !== id);
+  activeTasks.value = activeTasks.value.filter(task => task.id !== id);
+  blockedTasks.value = blockedTasks.value.filter(task => task.id !== id);
+  finishedTasks.value = finishedTasks.value.filter(task => task.id !== id);
+  if (modalId.value === id) modalId.value = null;
   post(ep_delete, { id: id })
-    .then(() => store.dispatch('getTasks'));
+    .then(fetchTasks);
 };
 </script>
 
@@ -326,12 +374,13 @@ const deleteTask = async (id) => {
       placeholder="to do..."
       size="large"
       style="fontSize: 24px; height: 56px; width: 40%;"
-      @pressEnter="add"
+      @pressEnter="addTask"
     />
     <div style="height: 30px" />
+
     <List
-      :dataSource="displayedTasks"
-      :style="{ width: '65%' }"
+      :dataSource="activeTasks"
+      style="width: 65%;"
       :split="false"
     >
       <template #renderItem="{ item }">
@@ -340,12 +389,17 @@ const deleteTask = async (id) => {
             <check-outlined
               class="show-on-hover clickable-icon"
               style="font-size: 1.25rem; padding-top: 4px;"
-              @click="finish(item.id)"
+              @click="finishTask(item.id)"
             />
+
             <p style="font-size: 1.25rem;">
               <span>{{ item.description }}</span>
               <span style="color: #666;"> #{{ item.id }}</span>
             </p>
+
+            <Tag v-for="tag of item.tags">
+              {{ tag }}
+            </Tag>
           </Space>
 
           <Space style="float: right;">
@@ -363,15 +417,115 @@ const deleteTask = async (id) => {
         </ListItem>
       </template>
     </List>
+
+    <template
+      v-if="showBlocked"
+    >
+      <div style="height: 30px" />
+
+      <p
+        class="rounded-corners"
+        style="width: 65%; font-family: Poppins; font-weight: bold; font-size: 1.2rem; padding-left: 4px;"
+      >
+        blocked tasks:
+      </p>
+
+      <List
+        :dataSource="blockedTasks"
+        style="width: 65%;"
+        :split="false"
+      >
+        <template #renderItem="{ item }">
+          <ListItem class="child-show-on-hover rounded-corners hover-highlight">
+            <Space>
+              <check-outlined
+                class="hide"
+                style="font-size: 1.25rem; padding-top: 4px;"
+              />
+
+              <p style="font-size: 1.25rem;">
+                <span>{{ item.description }}</span>
+                <span style="color: #666;"> #{{ item.id }}</span>
+              </p>
+
+              <Tag v-for="tag of item.tags">
+                {{ tag }}
+              </Tag>
+            </Space>
+
+            <Space style="float: right;">
+              <form-outlined
+                class="show-on-hover clickable-icon"
+                style="font-size: 1.25rem; padding-top: 4px;"
+                @click="showModal(item.id)"
+              />
+              <close-outlined
+                class="show-on-hover clickable-icon"
+                style="font-size: 1.25rem; padding-top: 4px;"
+                @click="deleteTask(item.id)"
+              />
+            </Space>
+          </ListItem>
+        </template>
+      </List>
+    </template>
+
+    <template
+      v-if="showFinished"
+    >
+      <div style="height: 30px" />
+
+      <p
+        class="rounded-corners"
+        style="width: 65%; font-family: Poppins; font-weight: bold; font-size: 1.2rem; padding-left: 4px;"
+      >
+        finished tasks:
+      </p>
+
+      <List
+        :dataSource="finishedTasks"
+        style="width: 65%;"
+        :split="false"
+      >
+        <template #renderItem="{ item }">
+          <ListItem class="child-show-on-hover rounded-corners hover-highlight">
+            <Space>
+              <check-outlined
+                style="font-size: 1.25rem; padding-top: 4px;"
+              />
+
+              <p style="font-size: 1.25rem;">
+                <span>{{ item.description }}</span>
+                <span style="color: #666;"> #{{ item.id }}</span>
+              </p>
+
+              <Tag v-for="tag of item.tags">
+                {{ tag }}
+              </Tag>
+            </Space>
+
+            <Space style="float: right;">
+              <close-outlined
+                class="show-on-hover clickable-icon"
+                style="font-size: 1.25rem; padding-top: 4px;"
+                @click="deleteTask(item.id)"
+              />
+            </Space>
+          </ListItem>
+        </template>
+      </List>
+    </template>
+
     <Modal
+      v-if="modalId !== null && modalId.value !== null"
       v-model:open="displayModal"
       @ok="modalOk()"
     >
       <Space direction="vertical" style="width: 100%;">
         <Space>
           <h3>
-            <span style="font-weight: bold;">{{ modalId === null ? 'details' : getTask(modalId).description }}</span>
-            <span style="font-weight: bold; color: #666;"> #{{ modalId === null ? '' : getTask(modalId).id }}</span>
+            <span style="font-weight: bold;">{{ getTask(modalId).description }}</span>
+            <span style="font-weight: bold; color: #666;"> #{{ getTask(modalId).id }}</span>
           </h3>
         </Space>
 
@@ -380,7 +534,43 @@ const deleteTask = async (id) => {
           :size="0"
           style="width: 100%;"
         >
-          <h4 class="rounded-corners" style="font-weight: bold;">requirements:</h4>
+          <h4 class="rounded-corners" style="font-weight: bold;">
+            tags:
+          </h4>
+
+          <Space
+            class="rounded-corners"
+            :wrap="true"
+          >
+            <Tag v-for="tag of getTask(modalId).tags">{{ tag }}</Tag>
+            <Tag>
+              <template #icon>
+                <plus-outlined />
+              </template>
+
+              <AutoComplete
+                ref="addTagInput"
+                v-model:value="addTagValue"
+                :options="allTags"
+              >
+                <Input
+                  class="rounded-corners"
+                  :bordered="false"
+                  placeholder="add tag..."
+                />
+              </AutoComplete>
+            </Tag>
+          </Space>
+        </Space>
+
+        <Space
+          direction="vertical"
+          :size="0"
+          style="width: 100%;"
+        >
+          <h4 class="rounded-corners" style="font-weight: bold;">
+            requirements:
+          </h4>
 
           <template
             v-if="modalId !== null"
@@ -427,7 +617,9 @@ const deleteTask = async (id) => {
           :size="0"
           style="width: 100%;"
         >
-          <h4 class="rounded-corners" style="font-weight: bold;">dependents:</h4>
+          <h4 class="rounded-corners" style="font-weight: bold;">
+            dependents:
+          </h4>
 
           <template
             v-if="modalId !== null"
@@ -494,7 +686,6 @@ const deleteTask = async (id) => {
         </span>
         <Switch
           v-model:checked="showBlocked"
-          @change="updateDisplayedTasks"
         />
       </Space>
 
@@ -504,7 +695,6 @@ const deleteTask = async (id) => {
         </span>
         <Switch
           v-model:checked="showFinished"
-          @change="updateDisplayedTasks"
         />
       </Space>
     </Space>
@@ -568,6 +758,10 @@ const deleteTask = async (id) => {
 .child-rotate-on-hover:hover .rotate-on-hover {
   transform: rotate(180deg);
   transition: transform 0.5s ease;
+}
+
+.hide {
+  opacity: 0%;
 }
 
 .show-on-hover {
