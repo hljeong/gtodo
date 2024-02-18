@@ -18,7 +18,9 @@ import {
   Tooltip,
 } from 'ant-design-vue';
 import {
+  CheckOutlined,
   CloseOutlined,
+  FormOutlined,
   SettingOutlined,
 } from '@ant-design/icons-vue';
 
@@ -303,18 +305,6 @@ const onDeleteDependentClick = id => {
   dependents.value = dependents.value.filter(taskId => taskId !== id);
 };
 
-const clickAddRequirement = () => {
-  nextTick(() => {
-    addRequirementInput.value.focus();
-  });
-};
-
-const clickAddDependent = () => {
-  nextTick(() => {
-    addDependentInput.value.focus();
-  });
-};
-
 const finish = async (id) => {
   store.dispatch('removeTask', id);
   post(ep_finish, { id: id })
@@ -345,31 +335,30 @@ const deleteTask = async (id) => {
       :split="false"
     >
       <template #renderItem="{ item }">
-        <!-- <ListItem @click="finish(item.id)"> -->
         <ListItem class="child-show-on-hover rounded-corners hover-highlight">
-          <template #actions>
-            <Space>
-              <Button
-                class="rounded-corners show-on-hover hover-highlight-text click-highlight-text"
-                type="danger"
-                @click="showModal(item.id)"
-              >
-                more
-              </Button>
-              <Button
-                class="rounded-corners show-on-hover hover-highlight-text click-highlight-text"
-                type="danger"
-                @click="deleteTask(item.id)"
-              >
-                delete
-              </Button>
-            </Space>
-          </template>
           <Space>
+            <check-outlined
+              class="show-on-hover clickable-icon"
+              style="font-size: 1.25rem; padding-top: 4px;"
+              @click="finish(item.id)"
+            />
             <p style="font-size: 1.25rem;">
               <span>{{ item.description }}</span>
               <span style="color: #666;"> #{{ item.id }}</span>
             </p>
+          </Space>
+
+          <Space style="float: right;">
+            <form-outlined
+              class="show-on-hover clickable-icon"
+              style="font-size: 1.25rem; padding-top: 4px;"
+              @click="showModal(item.id)"
+            />
+            <close-outlined
+              class="show-on-hover clickable-icon"
+              style="font-size: 1.25rem; padding-top: 4px;"
+              @click="deleteTask(item.id)"
+            />
           </Space>
         </ListItem>
       </template>
@@ -549,16 +538,16 @@ const deleteTask = async (id) => {
   background-color: #444;
 }
 
-.close {
+.clickable-icon {
   color: #666;
 }
 
-.close:hover {
+.clickable-icon:hover {
   cursor: pointer;
   color: #888;
 }
 
-.close:active {
+.clickable-icon:active {
   color: #444;
 }
 
@@ -569,10 +558,6 @@ const deleteTask = async (id) => {
 .active-highlight:active {
   cursor: text;
   background-color: #444;
-}
-
-.click-highlight-text:active {
-  color: #6e5581;
 }
 
 .rotate-on-hover {

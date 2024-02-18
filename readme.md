@@ -28,11 +28,11 @@ web app is hosted at `http://localhost:5173`.
 - server
   - create backups on a timer
 - webapp
-  - add finish logic
   - add tags and filters
-  - list technologies in readme
-  - change delete button to close icon
+  - add undo
+  - add hotkeys
   - make lists (main list and dependency lists) draggable
+  - list technologies in readme
   - add transitions for adding and deleting items
   - add transitions for updating displayed tasks
   - modularize
@@ -41,7 +41,6 @@ web app is hosted at `http://localhost:5173`.
   - add composition
   - todo bar always on top
   - back top float button
-  - add undo
   - show loading screen when fetching todo list for the first time
   - add shadow to todo bar
   - make todo descriptions editable

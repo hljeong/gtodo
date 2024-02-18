@@ -20,7 +20,7 @@ const ep_add_dependency = '/v1/add_dependency';
 const ep_delete_dependency = '/v1/delete_dependency';
 const ep_tasks = '/v1/tasks';
 
-const file = 'data.txt';
+const file = 'data.json';
 const tasks = [];
 if (fs.existsSync(file)) {
   fs.readFile(file, 'utf8', (err, data) => {
@@ -29,6 +29,26 @@ if (fs.existsSync(file)) {
       return
     }
     tasks.push(...JSON.parse(data));
+    for (const task : tasks) {
+      if (!('id' in task))
+        task.id = -1;
+      if (!('description' in task))
+        task.description = 'unknown task';
+      if (!('finished' in task))
+        task.finished = false;
+      if (!('time_created' in task))
+        task.time_created = null;
+      if (!('time_finished' in task))
+        task.time_finished = null;
+      if (!('requirements' in task))
+        task.requirements = [];
+      if (!('dependents' in task))
+        task.dependents = [];
+      if (!('tags' in task))
+        task.tags = [];
+      if (!('deleted' in task))
+        task.deleted = false;
+    }
   });
 }
 const save = () => {
@@ -86,6 +106,7 @@ app.post(ep_add, (req, res) => {
     time_finished: null,
     requirements: [],
     dependents: [],
+    tags: [],
     deleted: false,
   };
 
