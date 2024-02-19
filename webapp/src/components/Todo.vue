@@ -104,8 +104,10 @@ const post = async (endpoint, data) => {
   );
 };
 
+const hasTask = id => id in taskIndex.value;
+
 const getTask = id => {
-  if (!(id in taskIndex.value)) throw new Error(`task #${id} does not exist`);
+  if (!hasTask(id)) throw new Error(`task #${id} does not exist`);
   return taskIndex.value[id];
 };
 
@@ -115,6 +117,16 @@ const indexTasks = () => {
     taskIndex.value[task.id] = task;
   }
 };
+
+const isParent = task => task.subtasks.length !== 0;
+
+const requirementsFinished = task => task.requirements.every(
+  requirement_id => getTask(requirement_id).finished
+);
+
+const subtasksFinished = task => task.subtasks.every(
+  subtask_id => getTask(subtask_id).finished
+);
 
 const updateTasks = () => {
   finishedTasks.value = allTasks.value.filter(
@@ -126,9 +138,7 @@ const updateTasks = () => {
   );
 
   blockedTasks.value = unfinishedTasks.value.filter(
-    task => task.requirements.some(
-      requirement => !requirement.finished
-    )
+    task => !requirementsFinished(task)
   );
 
   activeTasks.value = unfinishedTasks.value.filter(
@@ -174,6 +184,9 @@ const fetchTasks = async () => {
   // reversed for now, todo: reorder according to policy
   allTasks.value = allTasks.value.reverse();
   indexTasks();
+  for (const task of allTasks.value) {
+    if (await finishTaskIfCompleted(task)) return;
+  }
   updateTasks();
   filterTasks();
   updateAllTags();
@@ -203,6 +216,8 @@ const addTask = async () => {
     tags: filterTags.value,
     requirements: [],
     dependents: [],
+    parent: null,
+    subtasks: [],
     deleted: false,
   }
   allTasks.value.unshift(dummyTask);
@@ -247,6 +262,7 @@ const deleteFilterTag = tag => {
 };
 
 const showModal = (id) => {
+  if (!hasTask(id)) return;
   const task = getTask(id);
 
   editDescription.value = false;
@@ -338,6 +354,39 @@ const getTaskFromDescriptionWithId = description => {
 
 const getDescriptionWithId = task => `${task.description} #${task.id}`;
 
+const isAncestor = (queryTaskId, taskId) => {
+  let ancestorId = getTask(taskId).parent;
+  while (ancestorId !== null) {
+    if (ancestorId === queryTaskId) return true;
+    ancestorId = getTask(ancestorId).parent;
+  }
+  return false;
+};
+
+const isDescendant = (queryTaskId, taskId) => isAncestor(taskId, queryTaskId);
+
+const isRequirement = (queryTaskId, taskId) => {
+  for (const requirementId of getTask(taskId).requirements) {
+    if (queryTaskId === requirementId) return true;
+  }
+  return false;
+};
+
+const isDependent = (queryTaskId, taskId) => isRequirement(taskId, queryTaskId);
+
+const isSubsequence = function(searchSequence, targetSequence, ignore = []) {
+  for (let i = 0, j = 0; j < searchSequence.length; ++j) {
+    const searchWord = searchSequence[j];
+    if (ignore.includes(searchWord)) continue;
+    while (
+      i < targetSequence.length &&
+      !targetSequence[i].startsWith(searchWord)
+    ) ++i;
+    if (i === targetSequence.length) return false;
+  }
+  return true;
+};
+
 const onAddTagSearch = searchText => {
   addTagOptions.value = allTagOptions.value.filter(
     tag => !getTask(modalId.value).tags.includes(tag.value)
@@ -356,53 +405,24 @@ const onAddRequirementSearch = searchText => {
     addRequirementOptions.value = [];
     return;
   }
-  const descriptions = unfinishedTasks.value.map(task => {
+  const options = unfinishedTasks.value.map(task => {
     return {
+      id: task.id,
       value: getDescriptionWithId(task),
     };
   });
   const searchSequence = searchText.trim().split(' ');
-  const filteredDescriptions = descriptions.filter(
-    description => {
-      const descriptionSequence = description.value.split(' ');
-      for (let i = 0, j = 0; j < searchSequence.length; ++j) {
-        const searchWord = searchSequence[j];
-        while (
-          i < descriptionSequence.length && !(
-              descriptionSequence[i] === searchWord || (
-                j === searchSequence.length - 1 &&
-                descriptionSequence[i].startsWith(searchWord)
-              )
-            )
-          ) {
-          ++i;
-        }
-        if (i === descriptionSequence.length) {
-          return false;
-        }
-      }
-      return true;
-    }
-  ).filter(
-    description => {
-      const showingTask = getTask(modalId.value);
-      if (description.value === getDescriptionWithId(showingTask)) {
-        return false;
-      }
-      for (const taskId of showingTask.requirements) {
-        if (description.value === getDescriptionWithId(getTask(taskId))) {
-          return false;
-        }
-      }
-      for (const taskId of showingTask.dependents) {
-        if (description.value === getDescriptionWithId(getTask(taskId))) {
-          return false;
-        }
-      }
-      return true;
-    }
+  addRequirementOptions.value = options.filter(
+    option => (
+      isSubsequence(
+        searchSequence,
+        option.value.split(' ')
+      ) && 
+      modalId.value !== option.id && 
+      !isRequirement(modalId.value, option.id) && 
+      !isDependent(modalId.value, option.id)
+    )
   );
-  addRequirementOptions.value = filteredDescriptions;
 };
 
 const onAddDependentSearch = searchText => {
@@ -410,53 +430,24 @@ const onAddDependentSearch = searchText => {
     addDependentOptions.value = [];
     return;
   }
-  const descriptions = unfinishedTasks.value.map(task => {
+  const options = unfinishedTasks.value.map(task => {
     return {
+      id: task.id,
       value: getDescriptionWithId(task),
     };
   });
   const searchSequence = searchText.trim().split(' ');
-  const filteredDescriptions = descriptions.filter(
-    description => {
-      const descriptionSequence = description.value.split(' ');
-      for (let i = 0, j = 0; j < searchSequence.length; ++j) {
-        const searchWord = searchSequence[j];
-        while (
-          i < descriptionSequence.length && !(
-              descriptionSequence[i] === searchWord || (
-                j === searchSequence.length - 1 &&
-                descriptionSequence[i].startsWith(searchWord)
-              )
-            )
-          ) {
-          ++i;
-        }
-        if (i === descriptionSequence.length) {
-          return false;
-        }
-      }
-      return true;
-    }
-  ).filter(
-    description => {
-      const showingTask = getTask(modalId.value);
-      if (description.value === getDescriptionWithId(showingTask)) {
-        return false;
-      }
-      for (const taskId of showingTask.requirements) {
-        if (description.value === getDescriptionWithId(getTask(taskId))) {
-          return false;
-        }
-      }
-      for (const taskId of showingTask.dependents) {
-        if (description.value === getDescriptionWithId(getTask(taskId))) {
-          return false;
-        }
-      }
-      return true;
-    }
+  addDependentOptions.value = options.filter(
+    option => (
+      isSubsequence(
+        searchSequence,
+        option.value.split(' ')
+      ) && 
+      modalId.value !== option.id && 
+      !isRequirement(modalId.value, option.id) && 
+      !isDependent(modalId.value, option.id)
+    )
   );
-  addDependentOptions.value = filteredDescriptions;
 };
 
 const clearAddRequirementValue = () => {
@@ -520,6 +511,7 @@ const onDeleteDependentClick = id => {
     }
   ).then(fetchTasks);
   dependents.value = dependents.value.filter(taskId => taskId !== id);
+
   dummyModalInput.value.focus();
 };
 
@@ -528,47 +520,23 @@ const onSetParentSearch = searchText => {
     setParentOptions.value = [];
     return;
   }
-  const descriptions = unfinishedTasks.value.map(task => {
+  const options = unfinishedTasks.value.map(task => {
     return {
+      id: task.id,
       value: getDescriptionWithId(task),
     };
   });
   const searchSequence = searchText.trim().split(' ');
-  const filteredDescriptions = descriptions.filter(
-    description => {
-      const descriptionSequence = description.value.split(' ');
-      for (let i = 0, j = 0; j < searchSequence.length; ++j) {
-        const searchWord = searchSequence[j];
-        while (
-          i < descriptionSequence.length && !(
-              descriptionSequence[i] === searchWord || (
-                j === searchSequence.length - 1 &&
-                descriptionSequence[i].startsWith(searchWord)
-              )
-            )
-          ) {
-          ++i;
-        }
-        if (i === descriptionSequence.length) {
-          return false;
-        }
-      }
-      return true;
-    }
-  ).filter(
-    description => {
-      const showingTask = getTask(modalId.value);
-      if (description.value === getDescriptionWithId(showingTask)) {
-        return false;
-      }
-      const task = getTaskFromDescriptionWithId(description.value);
-      if (task.parent !== null) {
-        return false;
-      }
-      return true;
-    }
+  setParentOptions.value = options.filter(
+    option => (
+      isSubsequence(
+        searchSequence,
+        option.value.split(' ')
+      ) && 
+      modalId.value !== option.id && 
+      !isDescendant(option.id, modalId.value)
+    )
   );
-  setParentOptions.value = filteredDescriptions;
 };
 
 const clearSetParentValue = () => {
@@ -609,55 +577,24 @@ const onAddSubtaskSearch = searchText => {
     addSubtaskOptions.value = [];
     return;
   }
-  const descriptions = unfinishedTasks.value.map(task => {
+  const options = unfinishedTasks.value.map(task => {
     return {
+      id: task.id,
       value: getDescriptionWithId(task),
     };
   });
   const searchSequence = searchText.trim().split(' ');
-  const showingTask = getTask(modalId.value);
-  const ancestors = [];
-  let ancestor = showingTask.parent;
-  while (ancestor !== null) {
-    ancestors.push(ancestor);
-    ancestor = getTask(ancestor).parent;
-  }
-  const filteredDescriptions = descriptions.filter(
-    description => {
-      const descriptionSequence = description.value.split(' ');
-      for (let i = 0, j = 0; j < searchSequence.length; ++j) {
-        const searchWord = searchSequence[j];
-        while (
-          i < descriptionSequence.length && !(
-              descriptionSequence[i] === searchWord || (
-                j === searchSequence.length - 1 &&
-                descriptionSequence[i].startsWith(searchWord)
-              )
-            )
-          ) {
-          ++i;
-        }
-        if (i === descriptionSequence.length) {
-          return false;
-        }
-      }
-      return true;
-    }
-  ).filter(
-    description => {
-      const showingTask = getTask(modalId.value);
-      if (description.value === getDescriptionWithId(showingTask)) {
-        return false;
-      }
-      for (const ancestorId of ancestors) {
-        if (description.value === getDescriptionWithId(getTask(ancestorId))) {
-          return false;
-        }
-      }
-      return true;
-    }
+  addSubtaskOptions.value = options.filter(
+    option => (
+      isSubsequence(
+        searchSequence,
+        option.value.split(' ')
+      ) && 
+      modalId.value !== option.id && 
+      !isAncestor(option.id, modalId.value) && 
+      getTask(option.id).parent === null
+    )
   );
-  addSubtaskOptions.value = filteredDescriptions;
 };
 
 const clearAddSubtaskValue = () => {
@@ -692,13 +629,27 @@ const onDeleteSubtaskClick = id => {
   dummyModalInput.value.focus();
 };
 
-const finishTask = async (id) => {
-  allTasks.value = allTasks.value.filter(task => task.id !== id);
-  activeTasks.value = activeTasks.value.filter(task => task.id !== id);
-  finishedTasks.value.push(getTask(id));
+const finishTaskIfCompleted = async task => {
+  // autocomplete only works on parent tasks
+  if (task.finished || !isParent(task)) return false;
+  
+  if (requirementsFinished(task) && subtasksFinished(task)) {
+    await finishTask(task);
+    return true;
+  }
+  return false;
+};
+
+const finishTask = async finished_task => {
+  allTasks.value = allTasks.value.filter(task => task.id !== finished_task.id);
+  activeTasks.value = activeTasks.value.filter(task => task.id !== finished_task.id);
+  finishedTasks.value.push(finished_task);
+  finished_task.finished = true;
+  updateTasks();
   filterTasks();
-  post(ep_finish, { id: id })
-    .then(fetchTasks);
+
+  await post(ep_finish, { id: finished_task.id });
+  await fetchTasks();
 };
 
 const deleteTask = async id => {
@@ -784,9 +735,16 @@ const deleteTask = async id => {
         >
           <Space align="baseline">
             <check-outlined
-              class="show-on-hover clickable-icon"
+              :class="
+                isParent(task) ? 
+                  'hide' :
+                  'show-on-hover clickable-icon'
+              "
               style="font-size: 1.25rem; padding-top: 4px;"
-              @click="finishTask(task.id)"
+              @click="
+                isParent(task) ? 
+                  () => null : finishTask(task)
+              "
             />
 
             <p style="font-size: 1.25rem;">
@@ -955,9 +913,10 @@ const deleteTask = async id => {
       v-if="modalId !== null && modalId.value !== null"
       v-model:open="displayModal"
     >
+      <!-- https://github.com/vuejs/vue/issues/6929#issuecomment-1952352146 -->
       <Input
         ref="dummyModalInput"
-        style="position: absolute; opacity: 0%;"
+        style="position: absolute; opacity: 0%; height: 0%; width: 0%;"
       />
       <Space direction="vertical" style="width: 100%;">
         <Space size="small">

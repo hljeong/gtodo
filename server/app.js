@@ -143,13 +143,13 @@ const validate = (endpoint, data) => {
 app.get(ep_tasks, (req, res) => {
   const ep = ep_tasks;
 
-  const msg = JSON.stringify(
+  const msg = `${tasks.length} tasks`;
+  log(ep, msg);
+
+  const tasks_stringified = JSON.stringify(
     tasks.filter(task => !task.deleted),
-    null,
-    2
   );
-  // log(ep, msg);
-  res.send(msg);
+  res.send(tasks_stringified);
 });
 
 app.post(ep_add, (req, res) => {
@@ -193,6 +193,16 @@ app.post(ep_finish, (req, res) => {
     const msg = `#${task.id} already finished`;
     err(ep, msg);
     return res.status(422).send(msg);
+  }
+  if (!task.requirements.every(requirement_id => get_task(requirement_id).finished)) {
+    const msg = `#${task.id} has unfinished requirements`;
+    err(ep, msg);
+    return res.status(400).send(msg);
+  }
+  if (!task.subtasks.every(subtask_id => get_task(subtask_id).finished)) {
+    const msg = `#${task.id} has unfinished subtasks`;
+    err(ep, msg);
+    return res.status(400).send(msg);
   }
 
   task.time_finished = get_time();
