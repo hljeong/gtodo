@@ -34,6 +34,8 @@ const ep_add_dependency = 'http://localhost:3000/v1/add_dependency';
 const ep_delete_dependency = 'http://localhost:3000/v1/delete_dependency';
 const ep_add_tag = 'http://localhost:3000/v1/add_tag';
 const ep_delete_tag = 'http://localhost:3000/v1/delete_tag';
+const ep_add_subtask = 'http://localhost:3000/v1/add_subtask';
+const ep_delete_subtask = 'http://localhost:3000/v1/delete_subtask';
 const ep_update = 'http://localhost:3000/v1/update';
 
 const allTasks = ref([]);
@@ -57,6 +59,7 @@ const addFilterTagValue = ref('');
 
 const displayModal = ref(false);
 const modalId = ref(null);
+const dummyModalInput = ref(null);
 
 const editDescription = ref(false);
 const editDescriptionInput = ref(null);
@@ -74,6 +77,15 @@ const dependents = ref([]);
 const addDependentOptions = ref([]);
 const addDependentValue = ref('');
 const addDependentInput = ref(null);
+
+const setParentOptions = ref([]);
+const setParentValue = ref('');
+const setParentInput = ref(null);
+
+const subtasks = ref([]);
+const addSubtaskOptions = ref([]);
+const addSubtaskValue = ref('');
+const addSubtaskInput = ref(null);
 
 const showBlocked = ref(false);
 const showFinished = ref(false);
@@ -193,8 +205,8 @@ const addTask = async () => {
     dependents: [],
     deleted: false,
   }
-  allTasks.value.push(dummyTask);
-  activeTasks.value.push(dummyTask);
+  allTasks.value.unshift(dummyTask);
+  activeTasks.value.unshift(dummyTask);
   filterTasks();
   post(ep_add, { description: promptInput.value, tags: filterTags.value })
     .then(fetchTasks);
@@ -252,6 +264,13 @@ const showModal = (id) => {
   dependents.value = task.dependents;
   addDependentOptions.value = [];
   addDependentValue.value = '';
+
+  setParentOptions.value = [];
+  setParentValue.value = '';
+
+  subtasks.value = task.subtasks;
+  addSubtaskOptions.value = [];
+  addSubtaskValue.value = '';
   
   modalId.value = id;
   displayModal.value = true;
@@ -489,6 +508,7 @@ const onDeleteRequirementClick = id => {
     }
   ).then(fetchTasks);
   requirements.value = requirements.value.filter(taskId => taskId !== id);
+  dummyModalInput.value.focus();
 };
 
 const onDeleteDependentClick = id => {
@@ -500,6 +520,176 @@ const onDeleteDependentClick = id => {
     }
   ).then(fetchTasks);
   dependents.value = dependents.value.filter(taskId => taskId !== id);
+  dummyModalInput.value.focus();
+};
+
+const onSetParentSearch = searchText => {
+  if (searchText === '') {
+    setParentOptions.value = [];
+    return;
+  }
+  const descriptions = unfinishedTasks.value.map(task => {
+    return {
+      value: getDescriptionWithId(task),
+    };
+  });
+  const searchSequence = searchText.trim().split(' ');
+  const filteredDescriptions = descriptions.filter(
+    description => {
+      const descriptionSequence = description.value.split(' ');
+      for (let i = 0, j = 0; j < searchSequence.length; ++j) {
+        const searchWord = searchSequence[j];
+        while (
+          i < descriptionSequence.length && !(
+              descriptionSequence[i] === searchWord || (
+                j === searchSequence.length - 1 &&
+                descriptionSequence[i].startsWith(searchWord)
+              )
+            )
+          ) {
+          ++i;
+        }
+        if (i === descriptionSequence.length) {
+          return false;
+        }
+      }
+      return true;
+    }
+  ).filter(
+    description => {
+      const showingTask = getTask(modalId.value);
+      if (description.value === getDescriptionWithId(showingTask)) {
+        return false;
+      }
+      const task = getTaskFromDescriptionWithId(description.value);
+      if (task.parent !== null) {
+        return false;
+      }
+      return true;
+    }
+  );
+  setParentOptions.value = filteredDescriptions;
+};
+
+const clearSetParentValue = () => {
+  setParentValue.value = '';
+  onSetParentSearch('');
+};
+
+const onSetParentSelect = (value, option) => {
+  if ('value' in option) {
+    const parent = getTaskFromDescriptionWithId(option.value);
+    post(
+      ep_add_subtask,
+      {
+        id: parent.id,
+        subtask_id: modalId.value,
+      }
+    ).then(fetchTasks);
+    getTask(modalId.value).parent = parent.id;
+  }
+  clearSetParentValue();
+  dummyModalInput.value.focus();
+};
+
+const onDeleteParentClick = () => {
+  post(
+    ep_delete_subtask,
+    {
+      id: getTask(modalId.value).parent,
+      subtask_id: modalId.value,
+    }
+  ).then(fetchTasks);
+  getTask(modalId.value).parent = null;
+  dummyModalInput.value.focus();
+};
+
+const onAddSubtaskSearch = searchText => {
+  if (searchText === '') {
+    addSubtaskOptions.value = [];
+    return;
+  }
+  const descriptions = unfinishedTasks.value.map(task => {
+    return {
+      value: getDescriptionWithId(task),
+    };
+  });
+  const searchSequence = searchText.trim().split(' ');
+  const showingTask = getTask(modalId.value);
+  const ancestors = [];
+  let ancestor = showingTask.parent;
+  while (ancestor !== null) {
+    ancestors.push(ancestor);
+    ancestor = getTask(ancestor).parent;
+  }
+  const filteredDescriptions = descriptions.filter(
+    description => {
+      const descriptionSequence = description.value.split(' ');
+      for (let i = 0, j = 0; j < searchSequence.length; ++j) {
+        const searchWord = searchSequence[j];
+        while (
+          i < descriptionSequence.length && !(
+              descriptionSequence[i] === searchWord || (
+                j === searchSequence.length - 1 &&
+                descriptionSequence[i].startsWith(searchWord)
+              )
+            )
+          ) {
+          ++i;
+        }
+        if (i === descriptionSequence.length) {
+          return false;
+        }
+      }
+      return true;
+    }
+  ).filter(
+    description => {
+      const showingTask = getTask(modalId.value);
+      if (description.value === getDescriptionWithId(showingTask)) {
+        return false;
+      }
+      for (const ancestorId of ancestors) {
+        if (description.value === getDescriptionWithId(getTask(ancestorId))) {
+          return false;
+        }
+      }
+      return true;
+    }
+  );
+  addSubtaskOptions.value = filteredDescriptions;
+};
+
+const clearAddSubtaskValue = () => {
+  addSubtaskValue.value = '';
+  onAddSubtaskSearch('');
+};
+
+const onAddSubtaskSelect = (value, option) => {
+  if ('value' in option) {
+    const subtask = getTaskFromDescriptionWithId(option.value);
+    post(
+      ep_add_subtask,
+      {
+        id: modalId.value,
+        subtask_id: subtask.id,
+      }
+    ).then(fetchTasks);
+    subtasks.value.push(subtask.id);
+  }
+  clearAddSubtaskValue();
+};
+
+const onDeleteSubtaskClick = id => {
+  post(
+    ep_delete_subtask,
+    {
+      id: modalId.value,
+      subtask_id: id,
+    }
+  ).then(fetchTasks);
+  subtasks.value = subtasks.value.filter(taskId => taskId !== id);
+  dummyModalInput.value.focus();
 };
 
 const finishTask = async (id) => {
@@ -765,6 +955,10 @@ const deleteTask = async id => {
       v-if="modalId !== null && modalId.value !== null"
       v-model:open="displayModal"
     >
+      <Input
+        ref="dummyModalInput"
+        style="position: absolute; opacity: 0%;"
+      />
       <Space direction="vertical" style="width: 100%;">
         <Space size="small">
           <Input
@@ -971,6 +1165,124 @@ const deleteTask = async id => {
               :bordered="false"
               placeholder="add dependent..."
               @blur="clearAddDependentValue"
+            />
+          </AutoComplete>
+        </Space>
+
+        <Space
+          :size="0"
+          style="width: 100%;"
+        >
+          <h4 class="rounded-corners" style="font-weight: bold;">
+            parent task:
+          </h4>
+
+          <div
+            v-if="modalId !== null && getTask(modalId).parent !== null"
+            class="
+              child-show-on-hover
+              rounded-corners
+              hover-highlight
+            "
+            style="
+              width: 100%;
+              display: flex;
+              align-items: center;
+            "
+          >
+            <p>
+              <span>{{ getTask(getTask(modalId).parent).description }}</span>
+              <span style="color: #666;"> #{{ getTask(getTask(modalId).parent).id }}</span>
+            </p>
+
+            <div style="flex: 1;">
+              <close-outlined
+                class="show-on-hover close"
+                style="float: right;"
+                @click="onDeleteParentClick()"
+              />
+            </div>
+          </div>
+
+          <AutoComplete
+            v-else
+            ref="setParentInput"
+            v-model:value="setParentValue"
+            style="width: 100%;"
+            :options="setParentOptions"
+            @search="onSetParentSearch"
+            @select="onSetParentSelect"
+          >
+            <Input
+              class="
+                rounded-corners
+                hover-highlight
+                active-highlight
+              "
+              :bordered="false"
+              placeholder="set parent..."
+              @blur="clearSetParentValue"
+            />
+          </AutoComplete>
+        </Space>
+
+        <Space
+          direction="vertical"
+          :size="0"
+          style="width: 100%;"
+        >
+          <h4 class="rounded-corners" style="font-weight: bold;">
+            subtasks:
+          </h4>
+
+          <template
+            v-if="modalId !== null"
+            v-for="taskId of subtasks"
+          >
+            <div
+              class="
+                child-show-on-hover
+                rounded-corners
+                hover-highlight
+              "
+              style="
+                width: 100%;
+                display: flex;
+                align-items: center;
+              "
+            >
+              <p>
+                <span>{{ getTask(taskId).description }}</span>
+                <span style="color: #666;"> #{{ getTask(taskId).id }}</span>
+              </p>
+
+              <div style="flex: 1;">
+                <close-outlined
+                  class="show-on-hover close"
+                  style="float: right;"
+                  @click="onDeleteSubtaskClick(taskId)"
+                />
+              </div>
+            </div>
+          </template>
+
+          <AutoComplete
+            ref="addSubtaskInput"
+            v-model:value="addSubtaskValue"
+            style="width: 100%;"
+            :options="addSubtaskOptions"
+            @search="onAddSubtaskSearch"
+            @select="onAddSubtaskSelect"
+          >
+            <Input
+              class="
+                rounded-corners
+                hover-highlight
+                active-highlight
+              "
+              :bordered="false"
+              placeholder="add subtask..."
+              @blur="clearAddSubtaskValue"
             />
           </AutoComplete>
         </Space>

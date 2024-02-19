@@ -21,6 +21,8 @@ const ep_add_dependency = '/v1/add_dependency';
 const ep_delete_dependency = '/v1/delete_dependency';
 const ep_add_tag = '/v1/add_tag';
 const ep_delete_tag = '/v1/delete_tag';
+const ep_add_subtask = '/v1/add_subtask';
+const ep_delete_subtask = '/v1/delete_subtask';
 const ep_update = '/v1/update';
 
 const file = 'data.json';
@@ -49,6 +51,10 @@ if (fs.existsSync(file)) {
         task.requirements = [];
       if (!('dependents' in task))
         task.dependents = [];
+      if (!('parent' in task))
+        task.parent = null;
+      if (!('subtasks' in task))
+        task.subtasks = [];
       if (!('deleted' in task))
         task.deleted = false;
     }
@@ -62,7 +68,8 @@ const save = () => {
   });
 };
 
-const getTime = () => new Date().toLocaleString();
+const get_time = () => new Date().toLocaleString();
+const get_task = id => tasks.filter(task => task.id === id)[0];
 
 const id_schema = Joi.number().integer().min(0);
 const description_schema = Joi.string();
@@ -103,6 +110,16 @@ const schema = {
     tag: tag_schema.required(),
   }),
 
+  [ep_add_subtask]: Joi.object({
+    id: id_schema.required(),
+    subtask_id: id_schema.required(),
+  }),
+
+  [ep_delete_subtask]: Joi.object({
+    id: id_schema.required(),
+    subtask_id: id_schema.required(),
+  }),
+
   [ep_update]: Joi.object({
     id: id_schema.required(),
     description: description_schema,
@@ -110,8 +127,8 @@ const schema = {
   }),
 };
 
-const log = (endpoint, msg) => console.log(`${endpoint} @ ${getTime()}:\n${msg}\n`);
-const err = (endpoint, msg) => console.error(`${endpoint} @ ${getTime()}:\n${msg}\n`);
+const log = (endpoint, msg) => console.log(`${endpoint} @ ${get_time()}:\n${msg}\n`);
+const err = (endpoint, msg) => console.error(`${endpoint} @ ${get_time()}:\n${msg}\n`);
 
 const validate = (endpoint, data) => {
   const { error, value } = schema[endpoint].validate(data);
@@ -146,11 +163,13 @@ app.post(ep_add, (req, res) => {
     id: tasks.length,
     description: description,
     finished: false,
-    time_created: getTime(),
+    time_created: get_time(),
     time_finished: null,
+    tags: tags ? tags : [],
     requirements: [],
     dependents: [],
-    tags: tags ? tags : [],
+    parent: null,
+    subtasks: [],
     deleted: false,
   };
 
@@ -171,16 +190,16 @@ app.post(ep_finish, (req, res) => {
   const { id } = data;
   const task = tasks[id];
   if (task.finished) {
-    const msg = `task #${task.id} already finished`;
+    const msg = `#${task.id} already finished`;
     err(ep, msg);
     return res.status(422).send(msg);
   }
 
-  task.time_finished = getTime();
+  task.time_finished = get_time();
   task.finished = true;
   save();
 
-  const msg = `task #${task.id} finished`;
+  const msg = `#${task.id} finished`;
   log(ep, msg);
   res.status(200).send(msg);
 });
@@ -194,7 +213,7 @@ app.post(ep_delete, (req, res) => {
   const { id } = data;
   const task = tasks[id];
   if (task.deleted) {
-    const msg = 'task already deleted';
+    const msg = `#${id} already deleted`;
     err(ep, msg);
     return res.status(422).send(msg);
   }
@@ -208,7 +227,7 @@ app.post(ep_delete, (req, res) => {
   task.deleted = true;
   save();
 
-  const msg = `task #${task.id} deleted`;
+  const msg = `#${task.id} deleted`;
   log(ep, msg);
   res.status(200).send(msg);
 });
@@ -274,13 +293,13 @@ app.post(ep_add_tag, (req, res) => {
   if (error) return res.status(400).send(error);
 
   const { id, tag } = data;
-  const task = tasks.filter(task => task.id === id)[0];
+  const task = get_task(id);
   if (!task.tags.includes(tag)) {
     task.tags.push(tag);
   }
   save();
 
-  const msg = `added tag ${tag} to task #${id}`;
+  const msg = `added tag ${tag} to #${id}`;
   log(ep, msg);
   res.status(200).send(msg);
 });
@@ -292,9 +311,9 @@ app.post(ep_delete_tag, (req, res) => {
   if (error) return res.status(400).send(error);
 
   const { id, tag } = data;
-  const task = tasks.filter(task => task.id === id)[0];
+  const task = get_task(id);
   if (!task.tags.includes(tag)) {
-    const msg = `task #${id} does not have tag ${tag}`;
+    const msg = `#${id} does not have tag ${tag}`;
     err(ep, msg);
     return res.status(422).send(msg);
   }
@@ -302,7 +321,55 @@ app.post(ep_delete_tag, (req, res) => {
   task.tags = task.tags.filter(task_tag => task_tag !== tag);
   save();
 
-  const msg = `deleted tag ${tag} from task #${id}`;
+  const msg = `deleted tag ${tag} from #${id}`;
+  log(ep, msg);
+  res.status(200).send(msg);
+});
+
+app.post(ep_add_subtask, (req, res) => {
+  const ep = ep_add_subtask;
+
+  const { error, data } = validate(ep, req.body);
+  if (error) return res.status(400).send(error);
+
+  const { id, subtask_id } = data;
+  const task = get_task(id);
+  const subtask = get_task(subtask_id);
+  if (subtask.parent !== null) {
+    const msg = `#${subtask_id} is already a subtask`;
+    err(ep, msg);
+    return res.status(400).send(msg);
+  }
+
+  task.subtasks.push(subtask.id);
+  subtask.parent = task.id;
+  save();
+
+  const msg = `added #${subtask_id} as a subtask of #${id}`;
+  log(ep, msg);
+  res.status(200).send(msg);
+});
+
+app.post(ep_delete_subtask, (req, res) => {
+  const ep = ep_delete_subtask;
+
+  const { error, data } = validate(ep, req.body);
+  if (error) return res.status(400).send(error);
+
+  const { id, subtask_id } = data;
+  const task = get_task(id);
+  const subtask = get_task(subtask_id);
+  if (!task.subtasks.includes(subtask.id)) {
+    const msg = `#${subtask_id} is not a subtask of #${id}`;
+    err(ep, msg);
+    return res.status(422).send(msg);
+  }
+
+  task.subtasks = task.subtasks.filter(task_subtask_id => task_subtask_id !== subtask.id);
+  subtask.parent = null;
+  save();
+
+  const msg = `deleted #${subtask_id} from subtasks of #${id}`;
   log(ep, msg);
   res.status(200).send(msg);
 });
