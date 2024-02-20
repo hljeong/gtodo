@@ -54,6 +54,8 @@ const allTagOptions = ref([]);
 const useArbitraryMatch = ref(false);
 const searchStrategy = ref(null);
 
+const showParentTasks = ref(true);
+
 const promptValue = ref('');
 
 const filterTags = ref([]);
@@ -155,15 +157,24 @@ const onSearchStrategyChange = () => {
   } else {
     searchStrategy.value = subsequenceMatch;
   }
-}
+  filterTasks();
+};
+
+const resetTaskFilter = () => {
+  filteredActiveTasks.value = activeTasks.value;
+  filteredBlockedTasks.value = blockedTasks.value;
+  filteredFinishedTasks.value = finishedTasks.value;
+};
 
 const filterTasksBy = filter => {
-  filteredActiveTasks.value = activeTasks.value.filter(filter);
-  filteredBlockedTasks.value = blockedTasks.value.filter(filter);
-  filteredFinishedTasks.value = finishedTasks.value.filter(filter);
-}
+  filteredActiveTasks.value = filteredActiveTasks.value.filter(filter);
+  filteredBlockedTasks.value = filteredBlockedTasks.value.filter(filter);
+  filteredFinishedTasks.value = filteredFinishedTasks.value.filter(filter);
+};
 
 const filterTasks = () => {
+  const filterOutParents = task => !isParent(task);
+
   const filterByTags = task => filterTags.value.every(
     tag => task.tags.includes(tag)
   );
@@ -177,6 +188,10 @@ const filterTasks = () => {
     )
   );
     
+  resetTaskFilter();
+  if (!showParentTasks.value) {
+    filterTasksBy(filterOutParents);
+  }
   filterTasksBy(filterByTags);
   filterTasksBy(filterByPrompt);
 };
@@ -1324,10 +1339,11 @@ const deleteTask = async id => {
             font-size: 16px;
           "
         >
-          show blocked tasks
+          arbitrary match on search
         </span>
         <Switch
-          v-model:checked="showBlocked"
+          v-model:checked="useArbitraryMatch"
+          @change="onSearchStrategyChange"
         />
       </Space>
 
@@ -1338,10 +1354,11 @@ const deleteTask = async id => {
             font-size: 16px;
           "
         >
-          show finished tasks
+          show parent tasks
         </span>
         <Switch
-          v-model:checked="showFinished"
+          v-model:checked="showParentTasks"
+          @change="filterTasks"
         />
       </Space>
 
@@ -1352,11 +1369,24 @@ const deleteTask = async id => {
             font-size: 16px;
           "
         >
-          arbitrary match on search
+          show blocked tasks
         </span>
         <Switch
-          v-model:checked="useArbitraryMatch"
-          @change="onSearchStrategyChange"
+          v-model:checked="showBlocked"
+        />
+      </Space>
+
+      <Space class="show-on-hover-5">
+        <span
+          style="
+            font-family: Poppins;
+            font-size: 16px;
+          "
+        >
+          show finished tasks
+        </span>
+        <Switch
+          v-model:checked="showFinished"
         />
       </Space>
     </Space>
@@ -1448,7 +1478,7 @@ const deleteTask = async id => {
 
 .show-on-hover-1 {
   opacity: 0%;
-  transition: opacity 1.2s ease;
+  transition: opacity 1.5s ease;
 }
 
 .child-show-on-hover:hover .show-on-hover-1 {
@@ -1458,7 +1488,7 @@ const deleteTask = async id => {
 
 .show-on-hover-2 {
   opacity: 0%;
-  transition: opacity 0.9s ease;
+  transition: opacity 1.2s ease;
 }
 
 .child-show-on-hover:hover .show-on-hover-2 {
@@ -1468,7 +1498,7 @@ const deleteTask = async id => {
 
 .show-on-hover-3 {
   opacity: 0%;
-  transition: opacity 0.6s ease;
+  transition: opacity 0.9s ease;
 }
 
 .child-show-on-hover:hover .show-on-hover-3 {
@@ -1478,12 +1508,22 @@ const deleteTask = async id => {
 
 .show-on-hover-4 {
   opacity: 0%;
-  transition: opacity 0.3s ease;
+  transition: opacity 0.6s ease;
 }
 
 .child-show-on-hover:hover .show-on-hover-4 {
   opacity: 100%;
   transition: opacity 1.6s ease;
+}
+
+.show-on-hover-5 {
+  opacity: 0%;
+  transition: opacity 0.3s ease;
+}
+
+.child-show-on-hover:hover .show-on-hover-5 {
+  opacity: 100%;
+  transition: opacity 2.0s ease;
 }
 
 </style>
