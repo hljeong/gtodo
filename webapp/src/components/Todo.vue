@@ -1,5 +1,9 @@
 <script setup>
-import { onMounted, ref, nextTick } from 'vue';
+import {
+  onMounted,
+  ref,
+  nextTick
+} from 'vue';
 import {
   AutoComplete,
   Button,
@@ -21,10 +25,11 @@ import {
   CheckOutlined,
   CloseOutlined,
   FormOutlined,
+  LockOutlined,
   PlusOutlined,
   SettingOutlined,
 } from '@ant-design/icons-vue';
-
+import gsap from 'gsap';
 
 const ep_tasks = 'http://localhost:3000/v0/tasks'
 const ep_add = 'http://localhost:3000/v0/add'
@@ -108,6 +113,46 @@ const post = async (endpoint, data) => {
     }
   );
 };
+
+const debounce = (fn, delay) => {
+  let timer;
+  return (...args) => {
+    clearTimeout(timer);
+    timer = setTimeout(() => fn.apply(this, args), delay);
+  };
+};
+
+const onTaskListBeforeEnter = el => {
+  el.style.opacity = 0;
+  el.style.height = 0;
+  el.style.padding = '0px 6px';
+}
+
+const onTaskListEnter = (el, done) => {
+  const idx = el.dataset.index;
+  const delay = idx * 0.10;
+  const decay = idx * 0.20;
+  gsap.to(el, {
+    opacity: 1,
+    height: '36px',
+    padding: '3px 6px',
+    delay: delay * Math.exp(-decay),
+    onComplete: done
+  });
+}
+
+const onTaskListLeave = (el, done) => {
+  const idx = el.dataset.index;
+  const delay = idx * 0.10;
+  const decay = idx * 0.20;
+  gsap.to(el, {
+    opacity: 0,
+    height: 0,
+    padding: '0px 6px',
+    delay: delay * Math.exp(-decay),
+    onComplete: done
+  });
+}
 
 const hasTask = id => id in taskIndex.value;
 
@@ -237,24 +282,12 @@ onMounted(() => {
   onSearchStrategyChange();
 });
 
+// const onPromptChange = debounce(filterTasks, 100);
+const onPromptChange = filterTasks;
+
 const addTask = async () => {
   if (promptValue.value === '') return;
 
-  const dummyTask = {
-    id: null,
-    description: promptValue.value,
-    finished: false,
-    time_created: null,
-    time_finished: null,
-    tags: filterTags.value,
-    requirements: [],
-    dependents: [],
-    parent: null,
-    subtasks: [],
-    deleted: false,
-  }
-  allTasks.value.unshift(dummyTask);
-  activeTasks.value.unshift(dummyTask);
   filterTasks();
   post(ep_add, { description: promptValue.value, tags: filterTags.value })
     .then(fetchTasks);
@@ -688,10 +721,7 @@ const finishTaskIfCompleted = async task => {
 const finishTask = async finished_task => {
   allTasks.value = allTasks.value.filter(task => task.id !== finished_task.id);
   activeTasks.value = activeTasks.value.filter(task => task.id !== finished_task.id);
-  finishedTasks.value.push(finished_task);
   finished_task.finished = true;
-  updateTasks();
-  filterTasks();
 
   await post(ep_finish, { id: finished_task.id });
   await fetchTasks();
@@ -702,7 +732,6 @@ const deleteTask = async id => {
   activeTasks.value = activeTasks.value.filter(task => task.id !== id);
   blockedTasks.value = blockedTasks.value.filter(task => task.id !== id);
   finishedTasks.value = finishedTasks.value.filter(task => task.id !== id);
-  filterTasks();
   if (modalId.value === id) modalId.value = null;
   post(ep_delete, { id: id })
     .then(fetchTasks);
@@ -722,7 +751,7 @@ const deleteTask = async id => {
         size="large"
         style="fontSize: 24px; height: 56px; width: 100%;"
         allow-clear
-        @change="filterTasks"
+        @change="onPromptChange"
         @pressEnter="addTask"
       />
 
@@ -766,31 +795,107 @@ const deleteTask = async id => {
     </Space>
     <div style="height: 30px" />
 
-    <List
-      :dataSource="filteredActiveTasks"
-      style="width: 65%;"
-      :split="false"
+    <TransitionGroup
+      :css="false"
+      @before-enter="onTaskListBeforeEnter"
+      @enter="onTaskListEnter"
+      @leave="onTaskListLeave"
     >
-      <template #renderItem="{ item: task }">
-        <ListItem
+      <div
+        v-for="(task, index) in filteredActiveTasks"
+        :key="task.id"
+        :data-index="index"
+        class="
+          child-show-on-hover
+          rounded-corners
+          hover-highlight
+        "
+        style="width: 65%;"
+      >
+        <Space align="baseline">
+          <check-outlined
+            :class="
+              isParent(task) ? 
+                'hide' :
+                'show-on-hover clickable-icon'
+            "
+            style="font-size: 1.25rem; padding-top: 4px;"
+            @click="
+              task.finished || isParent(task) ? 
+                () => null : finishTask(task)
+            "
+          />
+
+          <p style="font-size: 1.25rem;">
+            <span>{{ task.description }}</span>
+            <span style="color: #666;"> #{{ task.id }}</span>
+          </p>
+
+          <Space
+            :class="showTags ? 'smooth-show' : 'smooth-hide'"
+            :size="[0, 4]"
+            wrap
+          >
+            <Tag v-for="tag of task.tags">
+              {{ tag }}
+            </Tag>
+          </Space>
+        </Space>
+
+        <Space style="float: right;">
+          <form-outlined
+            class="show-on-hover clickable-icon"
+            style="font-size: 1.25rem; padding-top: 4px;"
+            @click="showModal(task.id)"
+          />
+          <close-outlined
+            class="show-on-hover clickable-icon"
+            style="font-size: 1.25rem; padding-top: 4px;"
+            @click="
+              allTasks.includes(task) ? 
+                deleteTask(task.id) : () => null
+            "
+          />
+        </Space>
+      </div>
+    </TransitionGroup>
+
+    <template v-if="showBlocked">
+      <div style="height: 30px" />
+
+      <p
+        class="rounded-corners"
+        style="
+          width: 65%;
+          font-family: Poppins;
+          font-weight: bold;
+          font-size: 1.2rem;
+          padding-left: 4px;
+        "
+      >
+        blocked tasks:
+      </p>
+
+      <TransitionGroup
+        :css="false"
+        @before-enter="onTaskListBeforeEnter"
+        @enter="onTaskListEnter"
+        @leave="onTaskListLeave"
+      >
+        <div
+          v-for="(task, index) in filteredBlockedTasks"
+          :key="task.id"
+          :data-index="index"
           class="
             child-show-on-hover
             rounded-corners
             hover-highlight
           "
+          style="width: 65%;"
         >
           <Space align="baseline">
-            <check-outlined
-              :class="
-                isParent(task) ? 
-                  'hide' :
-                  'show-on-hover clickable-icon'
-              "
+            <lock-outlined
               style="font-size: 1.25rem; padding-top: 4px;"
-              @click="
-                isParent(task) ? 
-                  () => null : finishTask(task)
-              "
             />
 
             <p style="font-size: 1.25rem;">
@@ -821,76 +926,8 @@ const deleteTask = async id => {
               @click="deleteTask(task.id)"
             />
           </Space>
-        </ListItem>
-      </template>
-    </List>
-
-    <template v-if="showBlocked">
-      <div style="height: 30px" />
-
-      <p
-        class="rounded-corners"
-        style="
-          width: 65%;
-          font-family: Poppins;
-          font-weight: bold;
-          font-size: 1.2rem;
-          padding-left: 4px;
-        "
-      >
-        blocked tasks:
-      </p>
-
-      <List
-        :dataSource="filteredBlockedTasks"
-        style="width: 65%;"
-        :split="false"
-      >
-        <template #renderItem="{ item: task }">
-          <ListItem
-            class="
-              child-show-on-hover
-              rounded-corners
-              hover-highlight
-            "
-          >
-            <Space align="baseline">
-              <check-outlined
-                class="hide"
-                style="font-size: 1.25rem; padding-top: 4px;"
-              />
-
-              <p style="font-size: 1.25rem;">
-                <span>{{ task.description }}</span>
-                <span style="color: #666;"> #{{ task.id }}</span>
-              </p>
-
-              <Space
-                :class="showTags ? 'smooth-show' : 'smooth-hide'"
-                :size="[0, 4]"
-                wrap
-              >
-                <Tag v-for="tag of task.tags">
-                  {{ tag }}
-                </Tag>
-              </Space>
-            </Space>
-
-            <Space style="float: right;">
-              <form-outlined
-                class="show-on-hover clickable-icon"
-                style="font-size: 1.25rem; padding-top: 4px;"
-                @click="showModal(task.id)"
-              />
-              <close-outlined
-                class="show-on-hover clickable-icon"
-                style="font-size: 1.25rem; padding-top: 4px;"
-                @click="deleteTask(task.id)"
-              />
-            </Space>
-          </ListItem>
-        </template>
-      </List>
+        </div>
+      </TransitionGroup>
     </template>
 
     <template v-if="showFinished">
@@ -1524,6 +1561,22 @@ const deleteTask = async id => {
 .child-show-on-hover:hover .show-on-hover-5 {
   opacity: 100%;
   transition: opacity 2.0s ease;
+}
+
+.taskList-move,
+.taskList-enter-active,
+.taskList-leave-active {
+  transition: all 0.5s ease;
+}
+
+.taskList-enter-from,
+.taskList-leave-to {
+  opacity: 0%;
+  transform: translateX(30px);
+}
+
+.taskList-leave-active {
+  position: absolute;
 }
 
 </style>
