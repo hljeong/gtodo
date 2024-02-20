@@ -39,6 +39,7 @@ const ep_update = 'http://localhost:3000/v0/update';
 
 const allTasks = ref([]);
 const taskIndex = ref({});
+const displayedTasks = ref([]);
 const unfinishedTasks = ref([]);
 const activeTasks = ref([]);
 const blockedTasks = ref([]);
@@ -52,8 +53,6 @@ const allTagOptions = ref([]);
 
 const useArbitraryMatch = ref(false);
 const searchStrategy = ref(null);
-
-const showParentTasks = ref(true);
 
 const promptValue = ref('');
 
@@ -93,6 +92,7 @@ const addSubtaskInput = ref(null);
 
 const showBlocked = ref(false);
 const showFinished = ref(false);
+const showParents = ref(true);
 const showTags = ref(true);
 
 const post = async (endpoint, data) => {
@@ -168,24 +168,29 @@ const onSearchStrategyChange = () => {
 };
 
 const resetTaskFilter = () => {
-  filteredActiveTasks.value = activeTasks.value;
-  filteredBlockedTasks.value = blockedTasks.value;
-  filteredFinishedTasks.value = finishedTasks.value;
+  displayedTasks.value = allTasks.value.slice();
 };
 
 const filterTasksBy = filter => {
-  filteredActiveTasks.value = filteredActiveTasks.value.filter(filter);
-  filteredBlockedTasks.value = filteredBlockedTasks.value.filter(filter);
-  filteredFinishedTasks.value = filteredFinishedTasks.value.filter(filter);
+  displayedTasks.value = displayedTasks.value.filter(filter);
 };
 
 const filterTasks = () => {
-  const filterOutParents = task => !isParent(task);
+  resetTaskFilter();
 
+  // filter out parents if not showing them
+  if (!showParents.value) {
+    const filterOutParents = task => !isParent(task);
+    filterTasksBy(filterOutParents);
+  }
+
+  // filter by tags
   const filterByTags = task => filterTags.value.every(
     tag => task.tags.includes(tag)
   );
+  filterTasksBy(filterByTags);
 
+  // filter by prompt
   const promptSequence = promptValue.value.trim().split(' ');
   const filterByPrompt = task => (
     searchStrategy.value(
@@ -194,13 +199,19 @@ const filterTasks = () => {
       task.tags
     )
   );
-    
-  resetTaskFilter();
-  if (!showParentTasks.value) {
-    filterTasksBy(filterOutParents);
-  }
-  filterTasksBy(filterByTags);
   filterTasksBy(filterByPrompt);
+
+  // filter out finished tasks if not showing them
+  if (!showFinished.value) {
+    const filterOutFinished = task => !task.finished;
+    filterTasksBy(filterOutFinished);
+  }
+
+  // filter out blocked tasks if not showing them
+  if (!showBlocked.value) {
+    const filterOutBlocked = requirementsFinished;
+    filterTasksBy(filterOutBlocked);
+  }
 };
 
 const updateAllTags = () => {
@@ -226,7 +237,7 @@ const fetchTasks = async () => {
   for (const task of allTasks.value) {
     if (await finishTaskIfCompleted(task)) return;
   }
-  updateTasks();
+  // updateTasks();
   filterTasks();
   updateAllTags();
   if (modalId.value !== null) {
@@ -758,7 +769,7 @@ const deleteTask = async id => {
     <div style="height: 30px" />
 
     <TaskList
-      :tasks="filteredActiveTasks"
+      :tasks="displayedTasks"
       :showTags="showTags"
       :editTask="task => showModal(task.id)"
       :deleteTask="task => deleteTask(task.id)"
@@ -768,6 +779,7 @@ const deleteTask = async id => {
       :isParent="isParent"
     />
 
+    <!--
     <OptionalTaskList
       :show="showBlocked"
       label="blocked tasks"
@@ -793,6 +805,7 @@ const deleteTask = async id => {
       :isBlocked="task => !requirementsFinished(task)"
       :isParent="isParent"
     />
+    -->
 
     <!--
     <template v-if="showBlocked">
@@ -1259,7 +1272,7 @@ const deleteTask = async id => {
           show parent tasks
         </span>
         <Switch
-          v-model:checked="showParentTasks"
+          v-model:checked="showParents"
           @change="filterTasks"
         />
       </Space>
@@ -1275,6 +1288,7 @@ const deleteTask = async id => {
         </span>
         <Switch
           v-model:checked="showBlocked"
+          @change="filterTasks"
         />
       </Space>
 
@@ -1289,6 +1303,7 @@ const deleteTask = async id => {
         </span>
         <Switch
           v-model:checked="showFinished"
+          @change="filterTasks"
         />
       </Space>
     </Space>
