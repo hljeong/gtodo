@@ -51,7 +51,10 @@ const filteredFinishedTasks = ref([]);
 const allTags = ref([]);
 const allTagOptions = ref([]);
 
-const promptInput = ref('');
+const useArbitraryMatch = ref(false);
+const searchStrategy = ref(null);
+
+const promptValue = ref('');
 
 const filterTags = ref([]);
 const addFilterTagOptions = ref([]);
@@ -146,22 +149,36 @@ const updateTasks = () => {
   );
 };
 
+const onSearchStrategyChange = () => {
+  if (useArbitraryMatch.value) {
+    searchStrategy.value = arbitraryMatch;
+  } else {
+    searchStrategy.value = subsequenceMatch;
+  }
+}
+
+const filterTasksBy = filter => {
+  filteredActiveTasks.value = activeTasks.value.filter(filter);
+  filteredBlockedTasks.value = blockedTasks.value.filter(filter);
+  filteredFinishedTasks.value = finishedTasks.value.filter(filter);
+}
+
 const filterTasks = () => {
-  filteredActiveTasks.value = activeTasks.value.filter(
-    task => filterTags.value.every(
-      tag => task.tags.includes(tag)
+  const filterByTags = task => filterTags.value.every(
+    tag => task.tags.includes(tag)
+  );
+
+  const promptSequence = promptValue.value.trim().split(' ');
+  const filterByPrompt = task => (
+    searchStrategy.value(
+      promptSequence,
+      task.description.split(' '),
+      task.tags
     )
   );
-  filteredBlockedTasks.value = blockedTasks.value.filter(
-    task => filterTags.value.every(
-      tag => task.tags.includes(tag)
-    )
-  );
-  filteredFinishedTasks.value = finishedTasks.value.filter(
-    task => filterTags.value.every(
-      tag => task.tags.includes(tag)
-    )
-  );
+    
+  filterTasksBy(filterByTags);
+  filterTasksBy(filterByPrompt);
 };
 
 const updateAllTags = () => {
@@ -202,14 +219,15 @@ onMounted(() => {
     .then(() => {
       addFilterTagOptions.value = allTagOptions.value;
     });
+  onSearchStrategyChange();
 });
 
 const addTask = async () => {
-  if (promptInput.value === '') return;
+  if (promptValue.value === '') return;
 
   const dummyTask = {
     id: null,
-    description: promptInput.value,
+    description: promptValue.value,
     finished: false,
     time_created: null,
     time_finished: null,
@@ -223,13 +241,9 @@ const addTask = async () => {
   allTasks.value.unshift(dummyTask);
   activeTasks.value.unshift(dummyTask);
   filterTasks();
-  post(ep_add, { description: promptInput.value, tags: filterTags.value })
+  post(ep_add, { description: promptValue.value, tags: filterTags.value })
     .then(fetchTasks);
-  promptInput.value = '';
-};
-
-const clearPrompt = () => {
-  promptInput.value = '';
+  promptValue.value = '';
 };
 
 const onAddFilterTagSearch = searchText => {
@@ -374,15 +388,31 @@ const isRequirement = (queryTaskId, taskId) => {
 
 const isDependent = (queryTaskId, taskId) => isRequirement(taskId, queryTaskId);
 
-const isSubsequence = function(searchSequence, targetSequence, ignore = []) {
+const subsequenceMatch = function(searchSequence, targetSequence, tags = []) {
   for (let i = 0, j = 0; j < searchSequence.length; ++j) {
     const searchWord = searchSequence[j];
-    if (ignore.includes(searchWord)) continue;
+    if (tags.some(tag => tag.startsWith(searchWord))) continue;
     while (
       i < targetSequence.length &&
       !targetSequence[i].startsWith(searchWord)
     ) ++i;
     if (i === targetSequence.length) return false;
+  }
+  return true;
+};
+
+const arbitraryMatch = function(searchSequence, targetSequence, tags = []) {
+  for (const searchWord of searchSequence) {
+    if (
+      !tags.some(
+        tag => tag.startsWith(searchWord)
+      ) &&
+      !targetSequence.some(
+        targetWord => targetWord.startsWith(searchWord)
+      )
+    ) {
+      return false;
+    }
   }
   return true;
 };
@@ -414,7 +444,7 @@ const onAddRequirementSearch = searchText => {
   const searchSequence = searchText.trim().split(' ');
   addRequirementOptions.value = options.filter(
     option => (
-      isSubsequence(
+      searchStrategy.value(
         searchSequence,
         option.value.split(' ')
       ) && 
@@ -439,7 +469,7 @@ const onAddDependentSearch = searchText => {
   const searchSequence = searchText.trim().split(' ');
   addDependentOptions.value = options.filter(
     option => (
-      isSubsequence(
+      searchStrategy.value(
         searchSequence,
         option.value.split(' ')
       ) && 
@@ -529,7 +559,7 @@ const onSetParentSearch = searchText => {
   const searchSequence = searchText.trim().split(' ');
   setParentOptions.value = options.filter(
     option => (
-      isSubsequence(
+      searchStrategy.value(
         searchSequence,
         option.value.split(' ')
       ) && 
@@ -586,7 +616,7 @@ const onAddSubtaskSearch = searchText => {
   const searchSequence = searchText.trim().split(' ');
   addSubtaskOptions.value = options.filter(
     option => (
-      isSubsequence(
+      searchStrategy.value(
         searchSequence,
         option.value.split(' ')
       ) && 
@@ -671,13 +701,14 @@ const deleteTask = async id => {
       style="width: 40%;"
     >
       <Input
-        v-model:value="promptInput"
+        v-model:value="promptValue"
         type="text"
         placeholder="to do..."
         size="large"
         style="fontSize: 24px; height: 56px; width: 100%;"
+        allow-clear
+        @change="filterTasks"
         @pressEnter="addTask"
-        @blur="clearPrompt"
       />
 
       <Space
@@ -1313,6 +1344,21 @@ const deleteTask = async id => {
           v-model:checked="showFinished"
         />
       </Space>
+
+      <Space class="show-on-hover-4">
+        <span
+          style="
+            font-family: Poppins;
+            font-size: 16px;
+          "
+        >
+          arbitrary match on search
+        </span>
+        <Switch
+          v-model:checked="useArbitraryMatch"
+          @change="onSearchStrategyChange"
+        />
+      </Space>
     </Space>
   </div>
 </template>
@@ -1402,7 +1448,7 @@ const deleteTask = async id => {
 
 .show-on-hover-1 {
   opacity: 0%;
-  transition: opacity 0.9s ease;
+  transition: opacity 1.2s ease;
 }
 
 .child-show-on-hover:hover .show-on-hover-1 {
@@ -1412,7 +1458,7 @@ const deleteTask = async id => {
 
 .show-on-hover-2 {
   opacity: 0%;
-  transition: opacity 0.6s ease;
+  transition: opacity 0.9s ease;
 }
 
 .child-show-on-hover:hover .show-on-hover-2 {
@@ -1422,12 +1468,22 @@ const deleteTask = async id => {
 
 .show-on-hover-3 {
   opacity: 0%;
-  transition: opacity 0.3s ease;
+  transition: opacity 0.6s ease;
 }
 
 .child-show-on-hover:hover .show-on-hover-3 {
   opacity: 100%;
   transition: opacity 1.2s ease;
+}
+
+.show-on-hover-4 {
+  opacity: 0%;
+  transition: opacity 0.3s ease;
+}
+
+.child-show-on-hover:hover .show-on-hover-4 {
+  opacity: 100%;
+  transition: opacity 1.6s ease;
 }
 
 </style>
