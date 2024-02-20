@@ -6,20 +6,11 @@ import {
 } from 'vue';
 import {
   AutoComplete,
-  Button,
-  Collapse,
-  CollapsePanel,
-  Col,
   Input,
-  List,
-  ListItem,
-  ListItemMeta,
   Modal,
-  Row,
   Space,
   Switch,
   Tag,
-  Tooltip,
 } from 'ant-design-vue';
 import {
   CheckOutlined,
@@ -122,38 +113,6 @@ const debounce = (fn, delay) => {
     timer = setTimeout(() => fn.apply(this, args), delay);
   };
 };
-
-const onTaskListBeforeEnter = el => {
-  el.style.opacity = 0;
-  el.style.height = 0;
-  el.style.padding = '0px 6px';
-}
-
-const onTaskListEnter = (el, done) => {
-  const idx = el.dataset.index;
-  const delay = idx * 0.10;
-  const decay = idx * 0.20;
-  gsap.to(el, {
-    opacity: 1,
-    height: '36px',
-    padding: '3px 6px',
-    delay: delay * Math.exp(-decay),
-    onComplete: done
-  });
-}
-
-const onTaskListLeave = (el, done) => {
-  const idx = el.dataset.index;
-  const delay = idx * 0.10;
-  const decay = idx * 0.20;
-  gsap.to(el, {
-    opacity: 0,
-    height: 0,
-    padding: '0px 6px',
-    delay: delay * Math.exp(-decay),
-    onComplete: done
-  });
-}
 
 const hasTask = id => id in taskIndex.value;
 
@@ -796,73 +755,6 @@ const deleteTask = async id => {
     </Space>
     <div style="height: 30px" />
 
-    <!--
-    <TransitionGroup
-      :css="false"
-      @before-enter="onTaskListBeforeEnter"
-      @enter="onTaskListEnter"
-      @leave="onTaskListLeave"
-    >
-      <div
-        v-for="(task, index) in /*filteredActiveTasks*/[]"
-        :key="task.id"
-        :data-index="index"
-        class="
-          child-show-on-hover
-          rounded-corners
-          hover-highlight
-        "
-        style="width: 65%;"
-      >
-        <Space align="baseline">
-          <check-outlined
-            :class="
-              isParent(task) ? 
-                'hide' :
-                'show-on-hover clickable-icon'
-            "
-            style="font-size: 1.25rem; padding-top: 4px;"
-            @click="
-              task.finished || isParent(task) ? 
-                () => null : finishTask(task)
-            "
-          />
-
-          <p style="font-size: 1.25rem;">
-            <span>{{ task.description }}</span>
-            <span style="color: #666;"> #{{ task.id }}</span>
-          </p>
-
-          <Space
-            :class="showTags ? 'smooth-show' : 'smooth-hide'"
-            :size="[0, 4]"
-            wrap
-          >
-            <Tag v-for="tag of task.tags">
-              {{ tag }}
-            </Tag>
-          </Space>
-        </Space>
-
-        <Space style="float: right;">
-          <form-outlined
-            class="show-on-hover clickable-icon"
-            style="font-size: 1.25rem; padding-top: 4px;"
-            @click="showModal(task.id)"
-          />
-          <close-outlined
-            class="show-on-hover clickable-icon"
-            style="font-size: 1.25rem; padding-top: 4px;"
-            @click="
-              allTasks.includes(task) ? 
-                deleteTask(task.id) : () => null
-            "
-          />
-        </Space>
-      </div>
-    </TransitionGroup>
-    -->
-
     <TaskList
       :tasks="filteredActiveTasks"
       :showTags="showTags"
@@ -890,60 +782,6 @@ const deleteTask = async id => {
         blocked tasks:
       </p>
 
-      <!--
-      <TransitionGroup
-        :css="false"
-        @before-enter="onTaskListBeforeEnter"
-        @enter="onTaskListEnter"
-        @leave="onTaskListLeave"
-      >
-        <div
-          v-for="(task, index) in filteredBlockedTasks"
-          :key="task.id"
-          :data-index="index"
-          class="
-            child-show-on-hover
-            rounded-corners
-            hover-highlight
-          "
-          style="width: 65%;"
-        >
-          <Space align="baseline">
-            <lock-outlined
-              style="font-size: 1.25rem; padding-top: 4px;"
-            />
-
-            <p style="font-size: 1.25rem;">
-              <span>{{ task.description }}</span>
-              <span style="color: #666;"> #{{ task.id }}</span>
-            </p>
-
-            <Space
-              :class="showTags ? 'smooth-show' : 'smooth-hide'"
-              :size="[0, 4]"
-              wrap
-            >
-              <Tag v-for="tag of task.tags">
-                {{ tag }}
-              </Tag>
-            </Space>
-          </Space>
-
-          <Space style="float: right;">
-            <form-outlined
-              class="show-on-hover clickable-icon"
-              style="font-size: 1.25rem; padding-top: 4px;"
-              @click="showModal(task.id)"
-            />
-            <close-outlined
-              class="show-on-hover clickable-icon"
-              style="font-size: 1.25rem; padding-top: 4px;"
-              @click="deleteTask(task.id)"
-            />
-          </Space>
-        </div>
-      </TransitionGroup>
-      -->
       <TaskList
         :tasks="filteredBlockedTasks"
         :showTags="showTags"
@@ -972,52 +810,6 @@ const deleteTask = async id => {
         finished tasks:
       </p>
 
-      <!--
-      <List
-        :dataSource="filteredFinishedTasks"
-        style="width: 65%;"
-        :split="false"
-      >
-        <template #renderItem="{ item: task }">
-          <ListItem
-            class="
-              child-show-on-hover
-              rounded-corners
-              hover-highlight
-            "
-          >
-            <Space align="baseline">
-              <check-outlined
-                style="font-size: 1.25rem; padding-top: 4px;"
-              />
-
-              <p style="font-size: 1.25rem;">
-                <span>{{ task.description }}</span>
-                <span style="color: #666;"> #{{ task.id }}</span>
-              </p>
-
-              <Space
-                :class="showTags ? 'smooth-show' : 'smooth-hide'"
-                :size="[0, 4]"
-                wrap
-              >
-                <Tag v-for="tag of task.tags">
-                  {{ tag }}
-                </Tag>
-              </Space>
-            </Space>
-
-            <Space style="float: right;">
-              <close-outlined
-                class="show-on-hover clickable-icon"
-                style="font-size: 1.25rem; padding-top: 4px;"
-                @click="deleteTask(task.id)"
-              />
-            </Space>
-          </ListItem>
-        </template>
-      </List>
-      -->
       <TaskList
         :tasks="filteredFinishedTasks"
         :showTags="showTags"
@@ -1599,22 +1391,6 @@ const deleteTask = async id => {
 .child-show-on-hover:hover .show-on-hover-5 {
   opacity: 100%;
   transition: opacity 2.0s ease;
-}
-
-.taskList-move,
-.taskList-enter-active,
-.taskList-leave-active {
-  transition: all 0.5s ease;
-}
-
-.taskList-enter-from,
-.taskList-leave-to {
-  opacity: 0%;
-  transform: translateX(30px);
-}
-
-.taskList-leave-active {
-  position: absolute;
 }
 
 </style>
