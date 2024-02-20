@@ -32,7 +32,6 @@ const props = defineProps([
 const onBeforeEnter = el => {
   el.style.opacity = 0;
   el.style.height = 0;
-  el.style.padding = '0px 6px';
 };
 
 const onEnter = (el, done) => {
@@ -41,8 +40,7 @@ const onEnter = (el, done) => {
   const decay = idx * 0.20;
   gsap.to(el, {
     opacity: 1,
-    height: '36px',
-    padding: '3px 6px',
+    height: 'auto',
     delay: delay * Math.exp(-decay),
     onComplete: done
   });
@@ -78,7 +76,11 @@ const onLeave = (el, done) => {
         rounded-corners
         hover-highlight
       "
-      style="width: 65%;"
+      style="
+        width: 65%;
+        display: flex;
+        align-items: stretch;
+      "
     >
       <Space align="center">
         <check-outlined
@@ -121,7 +123,7 @@ const onLeave = (el, done) => {
         </Space>
       </Space>
 
-      <Space style="float: right;">
+      <Space style="margin-left: auto;">
         <form-outlined
           class="show-on-hover clickable-icon icon"
           @click="props.editTask(task)"
