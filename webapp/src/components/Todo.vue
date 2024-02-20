@@ -26,17 +26,17 @@ import {
 } from '@ant-design/icons-vue';
 
 
-const ep_tasks = 'http://localhost:3000/v1/tasks'
-const ep_add = 'http://localhost:3000/v1/add'
-const ep_finish = 'http://localhost:3000/v1/finish';
-const ep_delete = 'http://localhost:3000/v1/delete';
-const ep_add_dependency = 'http://localhost:3000/v1/add_dependency';
-const ep_delete_dependency = 'http://localhost:3000/v1/delete_dependency';
-const ep_add_tag = 'http://localhost:3000/v1/add_tag';
-const ep_delete_tag = 'http://localhost:3000/v1/delete_tag';
-const ep_add_subtask = 'http://localhost:3000/v1/add_subtask';
-const ep_delete_subtask = 'http://localhost:3000/v1/delete_subtask';
-const ep_update = 'http://localhost:3000/v1/update';
+const ep_tasks = 'http://localhost:3000/v0/tasks'
+const ep_add = 'http://localhost:3000/v0/add'
+const ep_finish = 'http://localhost:3000/v0/finish';
+const ep_delete = 'http://localhost:3000/v0/delete';
+const ep_add_dependency = 'http://localhost:3000/v0/add_dependency';
+const ep_delete_dependency = 'http://localhost:3000/v0/delete_dependency';
+const ep_add_tag = 'http://localhost:3000/v0/add_tag';
+const ep_delete_tag = 'http://localhost:3000/v0/delete_tag';
+const ep_add_subtask = 'http://localhost:3000/v0/add_subtask';
+const ep_delete_subtask = 'http://localhost:3000/v0/delete_subtask';
+const ep_update = 'http://localhost:3000/v0/update';
 
 const allTasks = ref([]);
 const taskIndex = ref({});

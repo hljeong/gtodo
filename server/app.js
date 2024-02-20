@@ -13,17 +13,17 @@ app.use((req, res, next) => {
   next();
 });
 
-const ep_tasks = '/v1/tasks';
-const ep_add = '/v1/add';
-const ep_finish = '/v1/finish';
-const ep_delete = '/v1/delete';
-const ep_add_dependency = '/v1/add_dependency';
-const ep_delete_dependency = '/v1/delete_dependency';
-const ep_add_tag = '/v1/add_tag';
-const ep_delete_tag = '/v1/delete_tag';
-const ep_add_subtask = '/v1/add_subtask';
-const ep_delete_subtask = '/v1/delete_subtask';
-const ep_update = '/v1/update';
+const ep_tasks = '/v0/tasks';
+const ep_add = '/v0/add';
+const ep_finish = '/v0/finish';
+const ep_delete = '/v0/delete';
+const ep_add_dependency = '/v0/add_dependency';
+const ep_delete_dependency = '/v0/delete_dependency';
+const ep_add_tag = '/v0/add_tag';
+const ep_delete_tag = '/v0/delete_tag';
+const ep_add_subtask = '/v0/add_subtask';
+const ep_delete_subtask = '/v0/delete_subtask';
+const ep_update = '/v0/update';
 
 const file = 'data.json';
 const tasks = [];
