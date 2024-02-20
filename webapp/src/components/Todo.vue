@@ -41,12 +41,6 @@ const allTasks = ref([]);
 const taskIndex = ref({});
 const displayedTasks = ref([]);
 const unfinishedTasks = ref([]);
-const activeTasks = ref([]);
-const blockedTasks = ref([]);
-const finishedTasks = ref([]);
-const filteredActiveTasks = ref([]);
-const filteredBlockedTasks = ref([]);
-const filteredFinishedTasks = ref([]);
 
 const allTags = ref([]);
 const allTagOptions = ref([]);
@@ -140,31 +134,13 @@ const subtasksFinished = task => task.subtasks.every(
   subtask_id => getTask(subtask_id).finished
 );
 
-const updateTasks = () => {
-  finishedTasks.value = allTasks.value.filter(
-    task => task.finished
-  );
-
-  unfinishedTasks.value = allTasks.value.filter(
-    task => !task.finished
-  );
-
-  blockedTasks.value = unfinishedTasks.value.filter(
-    task => !requirementsFinished(task)
-  );
-
-  activeTasks.value = unfinishedTasks.value.filter(
-    task => !blockedTasks.value.includes(task)
-  );
-};
-
 const onSearchStrategyChange = () => {
   if (useArbitraryMatch.value) {
     searchStrategy.value = arbitraryMatch;
   } else {
     searchStrategy.value = subsequenceMatch;
   }
-  filterTasks();
+  updateDisplayedTasks();
 };
 
 const resetTaskFilter = () => {
@@ -214,6 +190,16 @@ const filterTasks = () => {
   }
 };
 
+const orderTasks = () => {
+  // reversed for now, todo: reorder according to policy
+  displayedTasks.value = displayedTasks.value.reverse();
+};
+
+const updateDisplayedTasks = () => {
+  filterTasks();
+  orderTasks();
+};
+
 const updateAllTags = () => {
   allTags.value = [
     ...new Set(
@@ -231,14 +217,14 @@ const updateAllTags = () => {
 
 const fetchTasks = async () => {
   allTasks.value = await (await fetch(ep_tasks)).json();
-  // reversed for now, todo: reorder according to policy
-  allTasks.value = allTasks.value.reverse();
   indexTasks();
   for (const task of allTasks.value) {
     if (await finishTaskIfCompleted(task)) return;
   }
-  // updateTasks();
-  filterTasks();
+  unfinishedTasks.value = allTasks.value.filter(
+    task => !task.finished
+  );
+  updateDisplayedTasks();
   updateAllTags();
   if (modalId.value !== null) {
     const task = getTask(modalId.value);
@@ -255,7 +241,7 @@ onMounted(() => {
   onSearchStrategyChange();
 });
 
-const onPromptChange = filterTasks;
+const onPromptChange = updateDisplayedTasks;
 
 const addTask = () => {
   if (promptValue.value === '') return;
@@ -263,7 +249,7 @@ const addTask = () => {
   post(ep_add, { description: promptValue.value, tags: filterTags.value })
     .then(fetchTasks);
   promptValue.value = '';
-  filterTasks();
+  updateDisplayedTasks();
 };
 
 const onAddFilterTagSearch = searchText => {
@@ -283,7 +269,7 @@ const onAddFilterTagSelect = (value, option) => {
   if ('value' in option) {
     const tag = option.value;
     filterTags.value.push(tag);
-    filterTasks();
+    updateDisplayedTasks();
   }
   clearAddFilterTagValue();
 };
@@ -292,7 +278,7 @@ const deleteFilterTag = tag => {
   filterTags.value = filterTags.value.filter(
     filterTag => filterTag !== tag
   );
-  filterTasks();
+  updateDisplayedTasks();
 };
 
 const showModal = (id) => {
@@ -693,7 +679,7 @@ const finishTaskIfCompleted = async task => {
 
 const finishTask = async finished_task => {
   allTasks.value = allTasks.value.filter(task => task.id !== finished_task.id);
-  activeTasks.value = activeTasks.value.filter(task => task.id !== finished_task.id);
+  displayedTasks.value = displayedTasks.value.filter(task => task.id !== finished_task.id);
   finished_task.finished = true;
 
   await post(ep_finish, { id: finished_task.id });
@@ -702,9 +688,7 @@ const finishTask = async finished_task => {
 
 const deleteTask = async id => {
   allTasks.value = allTasks.value.filter(task => task.id !== id);
-  activeTasks.value = activeTasks.value.filter(task => task.id !== id);
-  blockedTasks.value = blockedTasks.value.filter(task => task.id !== id);
-  finishedTasks.value = finishedTasks.value.filter(task => task.id !== id);
+  displayedTasks.value = displayedTasks.value.filter(task => task.id !== id);
   if (modalId.value === id) modalId.value = null;
   post(ep_delete, { id: id })
     .then(fetchTasks);
@@ -778,94 +762,6 @@ const deleteTask = async id => {
       :isBlocked="task => !requirementsFinished(task)"
       :isParent="isParent"
     />
-
-    <!--
-    <OptionalTaskList
-      :show="showBlocked"
-      label="blocked tasks"
-      :tasks="filteredBlockedTasks"
-      :showTags="showTags"
-      :editTask="task => showModal(task.id)"
-      :deleteTask="task => deleteTask(task.id)"
-      :finishTask="finishTask"
-      :taskExists="task => allTasks.includes(task)"
-      :isBlocked="task => !requirementsFinished(task)"
-      :isParent="isParent"
-    />
-
-    <OptionalTaskList
-      :show="showFinished"
-      label="finished tasks"
-      :tasks="filteredFinishedTasks"
-      :showTags="showTags"
-      :editTask="task => showModal(task.id)"
-      :deleteTask="task => deleteTask(task.id)"
-      :finishTask="finishTask"
-      :taskExists="task => allTasks.includes(task)"
-      :isBlocked="task => !requirementsFinished(task)"
-      :isParent="isParent"
-    />
-    -->
-
-    <!--
-    <template v-if="showBlocked">
-      <div style="height: 30px" />
-
-      <p
-        class="rounded-corners"
-        style="
-          width: 65%;
-          font-family: Poppins;
-          font-weight: bold;
-          font-size: 1.2rem;
-          padding-left: 4px;
-        "
-      >
-        blocked tasks:
-      </p>
-
-      <TaskList
-        :tasks="filteredBlockedTasks"
-        :showTags="showTags"
-        :editTask="task => showModal(task.id)"
-        :deleteTask="task => deleteTask(task.id)"
-        :finishTask="finishTask"
-        :taskExists="task => allTasks.includes(task)"
-        :isBlocked="task => !requirementsFinished(task)"
-        :isParent="isParent"
-      />
-    </template>
-    -->
-
-    <!--
-    <template v-if="showFinished">
-      <div style="height: 30px" />
-
-      <p
-        class="rounded-corners"
-        style="
-          width: 65%;
-          font-family: Poppins;
-          font-weight: bold;
-          font-size: 1.2rem;
-          padding-left: 4px;
-        "
-      >
-        finished tasks:
-      </p>
-
-      <TaskList
-        :tasks="filteredFinishedTasks"
-        :showTags="showTags"
-        :editTask="task => showModal(task.id)"
-        :deleteTask="task => deleteTask(task.id)"
-        :finishTask="finishTask"
-        :taskExists="task => allTasks.includes(task)"
-        :isBlocked="task => !requirementsFinished(task)"
-        :isParent="isParent"
-      />
-    </template>
-    -->
 
     <Modal
       v-if="modalId !== null && modalId.value !== null"
@@ -1273,7 +1169,7 @@ const deleteTask = async id => {
         </span>
         <Switch
           v-model:checked="showParents"
-          @change="filterTasks"
+          @change="updateDisplayedTasks"
         />
       </Space>
 
@@ -1288,7 +1184,7 @@ const deleteTask = async id => {
         </span>
         <Switch
           v-model:checked="showBlocked"
-          @change="filterTasks"
+          @change="updateDisplayedTasks"
         />
       </Space>
 
@@ -1303,7 +1199,7 @@ const deleteTask = async id => {
         </span>
         <Switch
           v-model:checked="showFinished"
-          @change="filterTasks"
+          @change="updateDisplayedTasks"
         />
       </Space>
     </Space>
