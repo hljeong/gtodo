@@ -261,7 +261,7 @@ const onAddFilterTagSearch = searchText => {
 
 const clearAddFilterTagValue = () => {
   addFilterTagValue.value = '';
-  onAddFilterTagSearch('');
+  addFilterTagOptions.value = [];
 };
 
 const onAddFilterTagSelect = (value, option) => {
@@ -357,7 +357,7 @@ const deleteTag = async (id, tag) => {
 
 const clearAddTagValue = () => {
   addTagValue.value = '';
-  onAddTagSearch('');
+  addTagOptions.value = [];
 };
 
 const onAddTagPressEnter = () => {
@@ -488,12 +488,12 @@ const onAddDependentSearch = searchText => {
 
 const clearAddRequirementValue = () => {
   addRequirementValue.value = '';
-  onAddRequirementSearch('');
+  addRequirementOptions.value = [];
 };
 
 const clearAddDependentValue = () => {
   addDependentValue.value = '';
-  onAddDependentSearch('');
+  addDependentOptions.value = [];
 };
 
 const onAddRequirementSelect = (value, option) => {
@@ -507,6 +507,7 @@ const onAddRequirementSelect = (value, option) => {
       }
     ).then(fetchTasks);
     requirements.value.push(requirement.id);
+    requirement.dependents.push(modalId.value);
   }
   clearAddRequirementValue();
 };
@@ -522,6 +523,7 @@ const onAddDependentSelect = (value, option) => {
       }
     ).then(fetchTasks);
     dependents.value.push(dependent.id);
+    dependent.requirements.push(modalId.value);
   }
   clearAddDependentValue();
 };
@@ -535,6 +537,8 @@ const onDeleteRequirementClick = id => {
     }
   ).then(fetchTasks);
   requirements.value = requirements.value.filter(taskId => taskId !== id);
+  getTask(id).dependents = getTask(id).dependents.filter(taskId => taskId !== modalId.value);
+
   dummyModalInput.value.focus();
 };
 
@@ -547,6 +551,7 @@ const onDeleteDependentClick = id => {
     }
   ).then(fetchTasks);
   dependents.value = dependents.value.filter(taskId => taskId !== id);
+  getTask(id).requirements = getTask(id).requirements.filter(taskId => taskId !== modalId.value);
 
   dummyModalInput.value.focus();
 };
@@ -570,14 +575,15 @@ const onSetParentSearch = searchText => {
         option.value.split(' ')
       ) && 
       modalId.value !== option.id && 
-      !isDescendant(option.id, modalId.value)
+      !isDescendant(option.id, modalId.value) &&
+      !isRequirement(option.id, modalId.value)
     )
   );
 };
 
 const clearSetParentValue = () => {
   setParentValue.value = '';
-  onSetParentSearch('');
+  setParentOptions.value = [];
 };
 
 const onSetParentSelect = (value, option) => {
@@ -635,7 +641,7 @@ const onAddSubtaskSearch = searchText => {
 
 const clearAddSubtaskValue = () => {
   addSubtaskValue.value = '';
-  onAddSubtaskSearch('');
+  addSubtaskOptions.value = [];
 };
 
 const onAddSubtaskSelect = (value, option) => {
@@ -649,6 +655,7 @@ const onAddSubtaskSelect = (value, option) => {
       }
     ).then(fetchTasks);
     subtasks.value.push(subtask.id);
+    subtask.parent = modalId.value;
   }
   clearAddSubtaskValue();
 };
@@ -662,6 +669,7 @@ const onDeleteSubtaskClick = id => {
     }
   ).then(fetchTasks);
   subtasks.value = subtasks.value.filter(taskId => taskId !== id);
+  getTask(id).parent = null;
   dummyModalInput.value.focus();
 };
 
@@ -680,6 +688,7 @@ const finishTask = async finished_task => {
   allTasks.value = allTasks.value.filter(task => task.id !== finished_task.id);
   displayedTasks.value = displayedTasks.value.filter(task => task.id !== finished_task.id);
   finished_task.finished = true;
+  updateDisplayedTasks();
 
   await post(ep_finish, { id: finished_task.id });
   await fetchTasks();
