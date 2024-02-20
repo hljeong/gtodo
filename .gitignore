@@ -1,6 +1,8 @@
 server/node_modules/
 server/data.json
 server/real_data.json
+server/backup
+server/restore
 
 # Logs
 webapp/logs

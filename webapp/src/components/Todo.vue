@@ -30,6 +30,7 @@ import {
   SettingOutlined,
 } from '@ant-design/icons-vue';
 import gsap from 'gsap';
+import TaskList from './TaskList.vue';
 
 const ep_tasks = 'http://localhost:3000/v0/tasks'
 const ep_add = 'http://localhost:3000/v0/add'
@@ -795,6 +796,7 @@ const deleteTask = async id => {
     </Space>
     <div style="height: 30px" />
 
+    <!--
     <TransitionGroup
       :css="false"
       @before-enter="onTaskListBeforeEnter"
@@ -802,7 +804,7 @@ const deleteTask = async id => {
       @leave="onTaskListLeave"
     >
       <div
-        v-for="(task, index) in filteredActiveTasks"
+        v-for="(task, index) in /*filteredActiveTasks*/[]"
         :key="task.id"
         :data-index="index"
         class="
@@ -859,6 +861,18 @@ const deleteTask = async id => {
         </Space>
       </div>
     </TransitionGroup>
+    -->
+
+    <TaskList
+      :tasks="filteredActiveTasks"
+      :showTags="showTags"
+      :editTask="task => showModal(task.id)"
+      :deleteTask="task => deleteTask(task.id)"
+      :finishTask="finishTask"
+      :taskExists="task => allTasks.includes(task)"
+      :isBlocked="task => !requirementsFinished(task)"
+      :isParent="isParent"
+    />
 
     <template v-if="showBlocked">
       <div style="height: 30px" />
@@ -876,6 +890,7 @@ const deleteTask = async id => {
         blocked tasks:
       </p>
 
+      <!--
       <TransitionGroup
         :css="false"
         @before-enter="onTaskListBeforeEnter"
@@ -928,6 +943,17 @@ const deleteTask = async id => {
           </Space>
         </div>
       </TransitionGroup>
+      -->
+      <TaskList
+        :tasks="filteredBlockedTasks"
+        :showTags="showTags"
+        :editTask="task => showModal(task.id)"
+        :deleteTask="task => deleteTask(task.id)"
+        :finishTask="finishTask"
+        :taskExists="task => allTasks.includes(task)"
+        :isBlocked="task => !requirementsFinished(task)"
+        :isParent="isParent"
+      />
     </template>
 
     <template v-if="showFinished">
@@ -946,6 +972,7 @@ const deleteTask = async id => {
         finished tasks:
       </p>
 
+      <!--
       <List
         :dataSource="filteredFinishedTasks"
         style="width: 65%;"
@@ -990,6 +1017,17 @@ const deleteTask = async id => {
           </ListItem>
         </template>
       </List>
+      -->
+      <TaskList
+        :tasks="filteredFinishedTasks"
+        :showTags="showTags"
+        :editTask="task => showModal(task.id)"
+        :deleteTask="task => deleteTask(task.id)"
+        :finishTask="finishTask"
+        :taskExists="task => allTasks.includes(task)"
+        :isBlocked="task => !requirementsFinished(task)"
+        :isParent="isParent"
+      />
     </template>
 
     <Modal
