@@ -23,7 +23,6 @@ import {
 } from '@ant-design/icons-vue';
 import gsap from 'gsap';
 import TaskList from './TaskList.vue';
-import OptionalTaskList from './OptionalTaskList.vue';
 
 const ep_tasks = 'http://localhost:3000/v0/tasks'
 const ep_add = 'http://localhost:3000/v0/add'
