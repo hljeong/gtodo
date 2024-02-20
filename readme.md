@@ -23,24 +23,3 @@ cd webapp
 npm run serve
 ```
 web app is hosted at `http://localhost:5173`.
-
-## todo
-- list technologies in readme
-- server
-  - create backups on a timer
-- webapp
-  - migrate api usage to use update
-  - add unfinish
-  - add undo
-  - add hotkeys
-  - add composition
-  - make lists (main list and dependency lists) draggable
-  - add transitions for adding and deleting items
-  - add transitions for updating displayed tasks
-  - modularize
-    - dependency list
-    - settings item
-  - todo bar always on top
-  - back top float button
-  - show loading screen when fetching todo list for the first time
-  - add shadow to todo bar
