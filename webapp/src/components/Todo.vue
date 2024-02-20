@@ -2,7 +2,8 @@
 import {
   onMounted,
   ref,
-  nextTick
+  nextTick,
+  Transition,
 } from 'vue';
 import {
   AutoComplete,
@@ -22,6 +23,7 @@ import {
 } from '@ant-design/icons-vue';
 import gsap from 'gsap';
 import TaskList from './TaskList.vue';
+import OptionalTaskList from './OptionalTaskList.vue';
 
 const ep_tasks = 'http://localhost:3000/v0/tasks'
 const ep_add = 'http://localhost:3000/v0/add'
@@ -242,16 +244,15 @@ onMounted(() => {
   onSearchStrategyChange();
 });
 
-// const onPromptChange = debounce(filterTasks, 100);
 const onPromptChange = filterTasks;
 
-const addTask = async () => {
+const addTask = () => {
   if (promptValue.value === '') return;
 
-  filterTasks();
   post(ep_add, { description: promptValue.value, tags: filterTags.value })
     .then(fetchTasks);
   promptValue.value = '';
+  filterTasks();
 };
 
 const onAddFilterTagSearch = searchText => {
@@ -334,6 +335,7 @@ const onEditDescriptionPressEnter = () => {
     .then(fetchTasks);
   
   editDescription.value = false;
+  dummyModalInput.value.focus();
 };
 
 const cancelEditDescription = () => {
@@ -766,6 +768,33 @@ const deleteTask = async id => {
       :isParent="isParent"
     />
 
+    <OptionalTaskList
+      :show="showBlocked"
+      label="blocked tasks"
+      :tasks="filteredBlockedTasks"
+      :showTags="showTags"
+      :editTask="task => showModal(task.id)"
+      :deleteTask="task => deleteTask(task.id)"
+      :finishTask="finishTask"
+      :taskExists="task => allTasks.includes(task)"
+      :isBlocked="task => !requirementsFinished(task)"
+      :isParent="isParent"
+    />
+
+    <OptionalTaskList
+      :show="showFinished"
+      label="finished tasks"
+      :tasks="filteredFinishedTasks"
+      :showTags="showTags"
+      :editTask="task => showModal(task.id)"
+      :deleteTask="task => deleteTask(task.id)"
+      :finishTask="finishTask"
+      :taskExists="task => allTasks.includes(task)"
+      :isBlocked="task => !requirementsFinished(task)"
+      :isParent="isParent"
+    />
+
+    <!--
     <template v-if="showBlocked">
       <div style="height: 30px" />
 
@@ -793,7 +822,9 @@ const deleteTask = async id => {
         :isParent="isParent"
       />
     </template>
+    -->
 
+    <!--
     <template v-if="showFinished">
       <div style="height: 30px" />
 
@@ -821,6 +852,7 @@ const deleteTask = async id => {
         :isParent="isParent"
       />
     </template>
+    -->
 
     <Modal
       v-if="modalId !== null && modalId.value !== null"
@@ -887,7 +919,10 @@ const deleteTask = async id => {
                 <close-outlined
                   class="hover-highlight close"
                   style="font-size: 10px;"
-                  @click="deleteTag(modalId, tag)"
+                  @click="() => {
+                    deleteTag(modalId, tag);
+                    dummyModalInput.focus();
+                  }"
                 />
               </template>
 

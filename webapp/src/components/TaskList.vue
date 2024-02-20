@@ -15,7 +15,7 @@ import {
 } from '@ant-design/icons-vue';
 import {
   nop,
-} from './Util.js'
+} from './Util.js';
 import gsap from 'gsap';
 
 const props = defineProps([
@@ -33,7 +33,7 @@ const onBeforeEnter = el => {
   el.style.opacity = 0;
   el.style.height = 0;
   el.style.padding = '0px 6px';
-}
+};
 
 const onEnter = (el, done) => {
   const idx = el.dataset.index;
@@ -46,7 +46,7 @@ const onEnter = (el, done) => {
     delay: delay * Math.exp(-decay),
     onComplete: done
   });
-}
+};
 
 const onLeave = (el, done) => {
   const idx = el.dataset.index;
@@ -59,11 +59,11 @@ const onLeave = (el, done) => {
     delay: delay * Math.exp(-decay),
     onComplete: done
   });
-}
+};
 </script>
 
 <template>
-    <TransitionGroup
+  <TransitionGroup
     :css="false"
     @before-enter="onBeforeEnter"
     @enter="onEnter"
@@ -140,6 +140,7 @@ const onLeave = (el, done) => {
 </template>
 
 <style scoped>
+
 .show-on-hover {
   opacity: 0%;
   transition: max-height 0.3s ease;
@@ -193,4 +194,5 @@ const onLeave = (el, done) => {
   opacity: 100%;
   transition: opacity 0.5s ease;
 }
+
 </style>
