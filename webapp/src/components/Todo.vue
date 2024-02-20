@@ -243,9 +243,9 @@ onMounted(() => {
 const onPromptChange = updateDisplayedTasks;
 
 const addTask = () => {
-  if (promptValue.value === '') return;
+  if (promptValue.value.trim() === '') return;
 
-  post(ep_add, { description: promptValue.value, tags: filterTags.value })
+  post(ep_add, { description: promptValue.value.trim(), tags: filterTags.value })
     .then(fetchTasks);
   promptValue.value = '';
   updateDisplayedTasks();
@@ -322,12 +322,12 @@ const onModalDescriptionClick = async () => {
 
 const onEditDescriptionPressEnter = () => {
   const task = getTask(modalId.value);
-  if (editDescriptionValue.value === '') {
+  if (editDescriptionValue.value.trim() === '') {
     editDescription.value = false;
     editDescriptionValue.value = task.description;
   }
-  task.description = editDescriptionValue.value;
-  updateTask(modalId.value, { description: editDescriptionValue.value })
+  task.description = editDescriptionValue.value.trim();
+  updateTask(modalId.value, { description: editDescriptionValue.value.trim() })
     .then(fetchTasks);
   
   editDescription.value = false;
@@ -361,8 +361,8 @@ const clearAddTagValue = () => {
 };
 
 const onAddTagPressEnter = () => {
-  if (addTagValue.value === '') return;
-  addTag(modalId.value, addTagValue.value);
+  if (addTagValue.value.trim() === '') return;
+  addTag(modalId.value, addTagValue.value.trim());
   clearAddTagValue();
 };
 
