@@ -690,7 +690,7 @@ const finishTaskIfCompleted = async task => {
   if (task.finished || !isParent(task)) return false;
   
   if (requirementsFinished(task) && subtasksFinished(task)) {
-    await finishTask(task);
+    await finishTask(task.id);
     return true;
   }
   return false;
