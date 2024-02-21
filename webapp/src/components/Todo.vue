@@ -809,7 +809,7 @@ const unpinTask = taskId => {
         ref="dummyModalInput"
         style="position: absolute; opacity: 0%; height: 0%; width: 0%;"
       />
-      <Space direction="vertical" style="width: 100%;">
+      <Space direction="vertical" size="middle" style="width: 100%;">
         <Space size="small">
           <Input
             ref="editDescriptionInput"
@@ -1022,12 +1022,15 @@ const unpinTask = taskId => {
           </AutoComplete>
         </Space>
 
-        <Space
-          :size="0"
-          style="width: 100%;"
+        <div
+          style="
+            width: 100%;
+            display: flex;
+            align-items: center;
+          "
         >
           <h4 class="rounded-corners" style="font-weight: bold;">
-            parent task:
+            parent:
           </h4>
 
           <div
@@ -1041,6 +1044,7 @@ const unpinTask = taskId => {
               width: 100%;
               display: flex;
               align-items: center;
+              flex: 1;
             "
           >
             <p>
@@ -1061,7 +1065,7 @@ const unpinTask = taskId => {
             v-else
             ref="setParentInput"
             v-model:value="setParentValue"
-            style="width: 100%;"
+            style="flex: 1;"
             :options="setParentOptions"
             @search="onSetParentSearch"
             @select="onSetParentSelect"
@@ -1077,7 +1081,7 @@ const unpinTask = taskId => {
               @blur="clearSetParentValue"
             />
           </AutoComplete>
-        </Space>
+        </div>
 
         <Space
           direction="vertical"
