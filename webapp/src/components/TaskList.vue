@@ -1,5 +1,6 @@
 <script setup>
 import {
+  nextTick,
   TransitionGroup,
 } from 'vue';
 import {
@@ -7,16 +8,19 @@ import {
   Tag,
 } from 'ant-design-vue';
 import {
+  ApartmentOutlined,
   CheckOutlined,
   CloseOutlined,
   FormOutlined,
   LockOutlined,
-  PlusSquareOutlined,
+  PushpinOutlined,
 } from '@ant-design/icons-vue';
 import {
   nop,
 } from './Util.js';
 import gsap from 'gsap';
+import Flip from 'gsap/Flip';
+gsap.registerPlugin(Flip);
 
 const props = defineProps([
   'tasks',
@@ -24,10 +28,26 @@ const props = defineProps([
   'editTask',
   'deleteTask',
   'finishTask',
+  'pinTask',
+  'unpinTask',
   'taskExists',
   'isBlocked',
   'isParent',
+  'isPinned',
 ]);
+
+const animate = change => {
+  const state = Flip.getState('.task-list-item');
+  change();
+  nextTick(() =>
+    Flip.from(state, {
+      targets: '.task-list-item',
+      duration: 0.5,
+      scale: true,
+      ease: 'power1.inOut',
+    })
+  );
+};
 
 const onBeforeEnter = el => {
   el.style.opacity = 0;
@@ -42,7 +62,7 @@ const onEnter = (el, done) => {
     opacity: 1,
     height: 'auto',
     delay: delay * Math.exp(-decay),
-    onComplete: done
+    onComplete: done,
   });
 };
 
@@ -55,7 +75,7 @@ const onLeave = (el, done) => {
     height: 0,
     padding: '0px 6px',
     delay: delay * Math.exp(-decay),
-    onComplete: done
+    onComplete: done,
   });
 };
 </script>
@@ -71,7 +91,9 @@ const onLeave = (el, done) => {
       v-for="(task, index) in props.tasks"
       :key="task.id"
       :data-index="index"
+      :data-flip-id="task.id"
       class="
+        task-list-item
         child-show-on-hover
         rounded-corners
         hover-highlight
@@ -91,7 +113,7 @@ const onLeave = (el, done) => {
           v-else-if="props.isBlocked(task)"
           class="icon"
         />
-        <plus-square-outlined
+        <apartment-outlined
           v-else-if="props.isParent(task)"
           class="icon"
         />
@@ -100,7 +122,7 @@ const onLeave = (el, done) => {
           class="show-on-hover clickable-icon"
           @click="
             task.finished ?
-              nop : props.finishTask(task)
+              nop() : props.finishTask(task.id)
           "
         />
 
@@ -124,16 +146,30 @@ const onLeave = (el, done) => {
       </Space>
 
       <Space style="margin-left: auto;">
+        <pushpin-outlined
+          v-if="!task.finished"
+          :class="
+            props.isPinned(task.id) ?
+              'icon' :
+              'show-on-hover clickable-icon'
+          "
+          @click="
+            props.isPinned(task.id) ?
+              animate(() => props.unpinTask(task.id)) :
+              animate(() => props.pinTask(task.id))
+          "
+        />
+
         <form-outlined
-          class="show-on-hover clickable-icon icon"
+          class="show-on-hover clickable-icon"
           @click="props.editTask(task)"
         />
 
         <close-outlined
-          class="show-on-hover clickable-icon icon"
+          class="show-on-hover clickable-icon"
           @click="
             props.taskExists(task) ?
-              props.deleteTask(task) : nop
+              props.deleteTask(task) : nop()
           "
         />
       </Space>
@@ -175,6 +211,21 @@ const onLeave = (el, done) => {
 }
 
 .clickable-icon:active {
+  color: #444;
+}
+
+.clickable-icon-bright {
+  color: #888;
+  font-size: 1.25rem;
+  padding-top: 6px;
+}
+
+.clickable-icon-bright:hover {
+  cursor: pointer;
+  color: #aaa;
+}
+
+.clickable-icon-bright:active {
   color: #444;
 }
 

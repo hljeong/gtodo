@@ -40,6 +40,7 @@ const allTasks = ref([]);
 const taskIndex = ref({});
 const displayedTasks = ref([]);
 const unfinishedTasks = ref([]);
+const pinnedTaskIds = ref([]);
 
 const allTags = ref([]);
 const allTagOptions = ref([]);
@@ -83,10 +84,10 @@ const addSubtaskOptions = ref([]);
 const addSubtaskValue = ref('');
 const addSubtaskInput = ref(null);
 
-const showBlocked = ref(false);
-const showFinished = ref(false);
-const showParents = ref(true);
 const showTags = ref(true);
+const showParents = ref(true);
+const showBlocked = ref(true);
+const showFinished = ref(false);
 
 const post = async (endpoint, data) => {
   return fetch(
@@ -192,6 +193,17 @@ const filterTasks = () => {
 const orderTasks = () => {
   // reversed for now, todo: reorder according to policy
   displayedTasks.value = displayedTasks.value.reverse();
+
+  const displayedpinnedTaskIds = pinnedTaskIds.value.filter(
+    taskId => displayedTasks.value.includes(getTask(taskId))
+  ).map(
+    taskId => getTask(taskId)
+  );
+  const displayedUnpinnedTaskIds = displayedTasks.value.filter(
+    task => !pinnedTaskIds.value.includes(task.id)
+  );
+  displayedTasks.value = displayedpinnedTaskIds;
+  displayedTasks.value.push(...displayedUnpinnedTaskIds);
 };
 
 const updateDisplayedTasks = () => {
@@ -684,22 +696,36 @@ const finishTaskIfCompleted = async task => {
   return false;
 };
 
-const finishTask = async finished_task => {
-  allTasks.value = allTasks.value.filter(task => task.id !== finished_task.id);
-  displayedTasks.value = displayedTasks.value.filter(task => task.id !== finished_task.id);
-  finished_task.finished = true;
+const finishTask = async id => {
+  getTask(id).finished = true;
+  pinnedTaskIds.value = pinnedTaskIds.value.filter(taskId => taskId !== id);
   updateDisplayedTasks();
 
-  await post(ep_finish, { id: finished_task.id });
+  await post(ep_finish, { id: id });
   await fetchTasks();
 };
 
-const deleteTask = async id => {
+const deleteTask = id => {
   allTasks.value = allTasks.value.filter(task => task.id !== id);
-  displayedTasks.value = displayedTasks.value.filter(task => task.id !== id);
+  pinnedTaskIds.value = pinnedTaskIds.value.filter(task => task.id !== id);
+  updateDisplayedTasks();
   if (modalId.value === id) modalId.value = null;
   post(ep_delete, { id: id })
     .then(fetchTasks);
+};
+
+const isPinned = taskId => pinnedTaskIds.value.includes(taskId);
+
+const pinTask = taskId => {
+  pinnedTaskIds.value.push(taskId)
+  updateDisplayedTasks();
+};
+
+const unpinTask = taskId => {
+  pinnedTaskIds.value = pinnedTaskIds.value.filter(
+    pinnedTaskId => pinnedTaskId !== taskId
+  );
+  updateDisplayedTasks();
 };
 </script>
 
@@ -766,9 +792,12 @@ const deleteTask = async id => {
       :editTask="task => showModal(task.id)"
       :deleteTask="task => deleteTask(task.id)"
       :finishTask="finishTask"
+      :pinTask="pinTask"
+      :unpinTask="unpinTask"
       :taskExists="task => allTasks.includes(task)"
       :isBlocked="task => !requirementsFinished(task)"
       :isParent="isParent"
+      :isPinned="isPinned"
     />
 
     <Modal
