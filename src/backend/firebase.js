@@ -9,17 +9,12 @@ import {
   onSnapshot,
   getCountFromServer,
 } from 'firebase/firestore';
-
-/*
-export const firebaseApp = initializeApp({
-  apiKey: "AIzaSyDsRn9G54ah2s0XRPtrybNMm4Y28jL7-oE",
-  authDomain: "gtodo-cc131.firebaseapp.com",
-  projectId: "gtodo-cc131",
-  storageBucket: "gtodo-cc131.appspot.com",
-  messagingSenderId: "202538327350",
-  appId: "1:202538327350:web:4287894d51e4a1b0ad2797",
-});
-*/
+import {
+  getAuth,
+  GoogleAuthProvider,
+  onAuthStateChanged,
+  signInWithPopup,
+} from 'firebase/auth';
 
 export const firebaseApp = initializeApp({
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
@@ -30,12 +25,37 @@ export const firebaseApp = initializeApp({
   appId: import.meta.env.VITE_FIREBASE_APP_ID,
 });
 
+export let userUid = 'default';
+
 const db = getFirestore(firebaseApp);
-const tasksRef = collection(db, 'tasks');
+const getTasksRef = (userUid) => collection(db, import.meta.env.VITE_FIREBASE_DATABASE, userUid, 'tasks');
+let tasksRef = getTasksRef(userUid);
+
+export const signIn = async () => {
+  const auth = getAuth(firebaseApp);
+  const provider = new GoogleAuthProvider();
+
+  try {
+    const result = await signInWithPopup(auth, provider);
+    userUid = result.user.uid;
+    tasksRef = getTasksRef(userUid);
+  } catch(error) {
+    console.error(`Failed to sign in: ${error}`);
+  }
+};
+
+const registerTasksOnce = (tasks) => onSnapshot(tasksRef, (snapshot) => {
+  tasks.value = snapshot.docs.map((doc) => doc.data());
+});
+
 // register update listener
 export const registerTasks = (tasks) => {
-  onSnapshot(tasksRef, (snapshot) => {
-    tasks.value = snapshot.docs.map((doc) => doc.data());
+  let unsubscribe = registerTasksOnce(tasks);
+  const auth = getAuth(firebaseApp);
+  onAuthStateChanged(auth, (user) => {
+    unsubscribe();
+    tasksRef = getTasksRef(user.uid);
+    unsubscribe = registerTasksOnce(tasks);
   });
 };
 

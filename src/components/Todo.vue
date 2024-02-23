@@ -97,7 +97,6 @@ const showBlocked = ref(true);
 const showFinished = ref(false);
 
 const tasks = ref([]);
-registerTasks(tasks);
 watch(tasks, () => fetchTasks());
 
 /*
@@ -256,6 +255,7 @@ onMounted(() => {
       addFilterTagOptions.value = allTagOptions.value;
     });
   onSearchStrategyChange();
+  registerTasks(tasks);
 });
 
 const onPromptChange = updateDisplayedTasks;
