@@ -15,9 +15,6 @@ import {
   LockOutlined,
   PushpinOutlined,
 } from '@ant-design/icons-vue';
-import {
-  nop,
-} from './Util.js';
 import gsap from 'gsap';
 import Flip from 'gsap/Flip';
 gsap.registerPlugin(Flip);
@@ -122,7 +119,7 @@ const onLeave = (el, done) => {
           class="show-on-hover clickable-icon"
           @click="
             task.finished ?
-              nop() : props.finishTask(task.id)
+              null : props.finishTask(task.id)
           "
         />
 
@@ -169,7 +166,7 @@ const onLeave = (el, done) => {
           class="show-on-hover clickable-icon"
           @click="
             props.taskExists(task) ?
-              props.deleteTask(task) : nop()
+              props.deleteTask(task) : null
           "
         />
       </Space>

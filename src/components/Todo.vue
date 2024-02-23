@@ -2,6 +2,7 @@
 import {
   onMounted,
   ref,
+  watch,
   nextTick,
   Transition,
 } from 'vue';
@@ -23,6 +24,12 @@ import {
 } from '@ant-design/icons-vue';
 import gsap from 'gsap';
 import TaskList from './TaskList.vue';
+import {
+  registerTasks,
+  addTask,
+  updateTask,
+  deleteTask,
+} from '../backend/firebase.js';
 
 const ep_tasks = 'http://localhost:3000/v0/tasks'
 const ep_add = 'http://localhost:3000/v0/add'
@@ -89,6 +96,11 @@ const showParents = ref(true);
 const showBlocked = ref(true);
 const showFinished = ref(false);
 
+const tasks = ref([]);
+registerTasks(tasks);
+watch(tasks, () => fetchTasks());
+
+/*
 const post = async (endpoint, data) => {
   return fetch(
     endpoint,
@@ -101,14 +113,7 @@ const post = async (endpoint, data) => {
     }
   );
 };
-
-const debounce = (fn, delay) => {
-  let timer;
-  return (...args) => {
-    clearTimeout(timer);
-    timer = setTimeout(() => fn.apply(this, args), delay);
-  };
-};
+*/
 
 const hasTask = id => id in taskIndex.value;
 
@@ -227,7 +232,8 @@ const updateAllTags = () => {
 };
 
 const fetchTasks = async () => {
-  allTasks.value = await (await fetch(ep_tasks)).json();
+  // allTasks.value = await (await fetch(ep_tasks)).json();
+  allTasks.value = tasks.value.filter(task => !task.deleted);
   indexTasks();
   for (const task of allTasks.value) {
     if (await finishTaskIfCompleted(task)) return;
@@ -254,13 +260,32 @@ onMounted(() => {
 
 const onPromptChange = updateDisplayedTasks;
 
-const addTask = () => {
+const fAddTask = async () => {
   if (promptValue.value.trim() === '') return;
 
-  post(ep_add, { description: promptValue.value.trim(), tags: filterTags.value })
-    .then(fetchTasks);
+  // post(ep_add, { description: promptValue.value.trim(), tags: filterTags.value })
+  /*
+  const id = fsTasks.value.length + 1;
+  setDoc(doc(fsTasksRef, id.toString()), {
+    id: id,
+    description: promptValue.value.trim(),
+    finished: false,
+    deleted: false,
+    timeCreated: new Date().toLocaleString(),
+    timeFinised: null,
+    tags: filterTags.value,
+    requirements: [],
+    dependents: [],
+    parent: null,
+    subtasks: [],
+  });// .then(fetchTasks);
+  */
+  addTask({
+    description: promptValue.value.trim(),
+    tags: filterTags.value,
+  });
   promptValue.value = '';
-  updateDisplayedTasks();
+  // updateDisplayedTasks();
 };
 
 const onAddFilterTagSearch = searchText => {
@@ -323,8 +348,6 @@ const showModal = (id) => {
   displayModal.value = true;
 };
 
-const updateTask = async (id, update) => post(ep_update, { id: id, ...update });
-
 const onModalDescriptionClick = async () => {
   editDescriptionValue.value = getTask(modalId.value).description;
   editDescription.value = true;
@@ -353,18 +376,22 @@ const cancelEditDescription = () => {
 
 const addTag = async (id, tag) => {
   const task = getTask(id);
-  if (!task.tags.includes(tag)) {
-    task.tags.push(tag);
-  }
-  post(ep_add_tag, { id: id, tag: tag })
-    .then(fetchTasks);
+  // skip check: !task.tags.includes(tag)
+  task.tags.push(tag);
+  updateTask(id, { tags: task.tags });
+
+  // post(ep_add_tag, { id: id, tag: tag })
+  //   .then(fetchTasks);
 };
 
 const deleteTag = async (id, tag) => {
   const task = getTask(id);
+  // skip check: task.tags.includes(tag)
   task.tags = task.tags.filter(taskTag => taskTag !== tag);
-  post(ep_delete_tag, { id: id, tag: tag })
-    .then(fetchTasks);
+  updateTask(id, { tags: task.tags });
+
+  // post(ep_delete_tag, { id: id, tag: tag })
+  //   .then(fetchTasks);
 };
 
 const clearAddTagValue = () => {
@@ -511,6 +538,7 @@ const clearAddDependentValue = () => {
 const onAddRequirementSelect = (value, option) => {
   if ('value' in option) {
     const requirement = getTaskFromDescriptionWithId(option.value);
+    /*
     post(
       ep_add_dependency,
       {
@@ -518,8 +546,12 @@ const onAddRequirementSelect = (value, option) => {
         dependent: modalId.value,
       }
     ).then(fetchTasks);
+    */
+    // skip checks
     requirements.value.push(requirement.id);
+    updateTask(modalId.value, { requirements: requirements.value });
     requirement.dependents.push(modalId.value);
+    updateTask(requirement.id, { dependents: requirement.dependents });
   }
   clearAddRequirementValue();
 };
@@ -527,6 +559,7 @@ const onAddRequirementSelect = (value, option) => {
 const onAddDependentSelect = (value, option) => {
   if ('value' in option) {
     const dependent = getTaskFromDescriptionWithId(option.value);
+    /*
     post(
       ep_add_dependency,
       {
@@ -534,13 +567,18 @@ const onAddDependentSelect = (value, option) => {
         dependent: dependent.id,
       }
     ).then(fetchTasks);
+    */
+    // skip checks
     dependents.value.push(dependent.id);
+    updateTask(modalId.value, { dependents: dependents.value });
     dependent.requirements.push(modalId.value);
+    updateTask(dependent.id, { requirements: dependent.requirements });
   }
   clearAddDependentValue();
 };
 
 const onDeleteRequirementClick = id => {
+  /*
   post(
     ep_delete_dependency,
     {
@@ -548,13 +586,19 @@ const onDeleteRequirementClick = id => {
       dependent: modalId.value,
     }
   ).then(fetchTasks);
+  */
+  // skip checks
+  // todo: fix flicker (debounce rerendering?)
   requirements.value = requirements.value.filter(taskId => taskId !== id);
+  updateTask(modalId.value, { requirements: requirements.value });
   getTask(id).dependents = getTask(id).dependents.filter(taskId => taskId !== modalId.value);
+  updateTask(id, { dependents: getTask(id).dependents });
 
   dummyModalInput.value.focus();
 };
 
 const onDeleteDependentClick = id => {
+  /*
   post(
     ep_delete_dependency,
     {
@@ -562,8 +606,13 @@ const onDeleteDependentClick = id => {
       dependent: id,
     }
   ).then(fetchTasks);
+  */
+  // skip checks
+  // todo: fix flicker
   dependents.value = dependents.value.filter(taskId => taskId !== id);
+  updateTask(modalId.value, { dependents: dependents.value });
   getTask(id).requirements = getTask(id).requirements.filter(taskId => taskId !== modalId.value);
+  updateTask(id, { requirements: getTask(id).requirements });
 
   dummyModalInput.value.focus();
 };
@@ -601,6 +650,7 @@ const clearSetParentValue = () => {
 const onSetParentSelect = (value, option) => {
   if ('value' in option) {
     const parent = getTaskFromDescriptionWithId(option.value);
+    /*
     post(
       ep_add_subtask,
       {
@@ -608,13 +658,19 @@ const onSetParentSelect = (value, option) => {
         subtask_id: modalId.value,
       }
     ).then(fetchTasks);
+    */
+    // skip checks
     getTask(modalId.value).parent = parent.id;
+    updateTask(modalId.value, { parent: parent.id });
+    parent.subtasks.push(modalId.value);
+    updateTask(parent.id, { subtasks: parent.subtasks });
   }
   clearSetParentValue();
   dummyModalInput.value.focus();
 };
 
 const onDeleteParentClick = () => {
+  /*
   post(
     ep_delete_subtask,
     {
@@ -622,7 +678,13 @@ const onDeleteParentClick = () => {
       subtask_id: modalId.value,
     }
   ).then(fetchTasks);
+  */
+  const parent = getTask(getTask(modalId.value).parent);
+  // skip checks
   getTask(modalId.value).parent = null;
+  updateTask(modalId.value, { parent: null });
+  parent.subtasks = parent.subtasks.filter(subtaskId => subtaskId !== modalId.value);
+  updateTask(parent.id, { subtasks: parent.subtasks });
   dummyModalInput.value.focus();
 };
 
@@ -658,7 +720,9 @@ const clearAddSubtaskValue = () => {
 
 const onAddSubtaskSelect = (value, option) => {
   if ('value' in option) {
+    // todo: use option.id?
     const subtask = getTaskFromDescriptionWithId(option.value);
+    /*
     post(
       ep_add_subtask,
       {
@@ -666,13 +730,18 @@ const onAddSubtaskSelect = (value, option) => {
         subtask_id: subtask.id,
       }
     ).then(fetchTasks);
+    */
+    // skip checks
     subtasks.value.push(subtask.id);
+    updateTask(modalId.value, { subtasks: subtasks.value });
     subtask.parent = modalId.value;
+    updateTask(subtask.id, { parent: modalId.value });
   }
   clearAddSubtaskValue();
 };
 
 const onDeleteSubtaskClick = id => {
+  /*
   post(
     ep_delete_subtask,
     {
@@ -680,8 +749,12 @@ const onDeleteSubtaskClick = id => {
       subtask_id: id,
     }
   ).then(fetchTasks);
+  */
+  const subtask = getTask(id);
   subtasks.value = subtasks.value.filter(taskId => taskId !== id);
-  getTask(id).parent = null;
+  updateTask(modalId.value, { subtasks: subtasks.value });
+  subtask.parent = null;
+  updateTask(subtask.id, { parent: null });
   dummyModalInput.value.focus();
 };
 
@@ -696,22 +769,28 @@ const finishTaskIfCompleted = async task => {
   return false;
 };
 
-const finishTask = async id => {
+const finishTask = id => {
   getTask(id).finished = true;
   pinnedTaskIds.value = pinnedTaskIds.value.filter(taskId => taskId !== id);
   updateDisplayedTasks();
 
-  await post(ep_finish, { id: id });
-  await fetchTasks();
+  updateTask(id, { finished: true });
+  // await post(ep_finish, { id: id });
+  // await fetchTasks();
 };
 
-const deleteTask = id => {
+const fDeleteTask = id => {
+  /*
   allTasks.value = allTasks.value.filter(task => task.id !== id);
   pinnedTaskIds.value = pinnedTaskIds.value.filter(task => task.id !== id);
   updateDisplayedTasks();
+  */
+  deleteTask(id);
   if (modalId.value === id) modalId.value = null;
+  /*
   post(ep_delete, { id: id })
     .then(fetchTasks);
+  */
 };
 
 const isPinned = taskId => pinnedTaskIds.value.includes(taskId);
@@ -743,7 +822,7 @@ const unpinTask = taskId => {
         style="fontSize: 24px; height: 56px; width: 100%;"
         allow-clear
         @change="onPromptChange"
-        @pressEnter="addTask"
+        @pressEnter="fAddTask"
       />
 
       <Space
@@ -790,7 +869,7 @@ const unpinTask = taskId => {
       :tasks="displayedTasks"
       :showTags="showTags"
       :editTask="task => showModal(task.id)"
-      :deleteTask="task => deleteTask(task.id)"
+      :deleteTask="task => fDeleteTask(task.id)"
       :finishTask="finishTask"
       :pinTask="pinTask"
       :unpinTask="unpinTask"
