@@ -30,3 +30,7 @@ cypress/screenshots/
 *.tsbuildinfo
 
 .env*
+
+.firebase/
+.firebaserc
+firebase.json
