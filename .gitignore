@@ -33,4 +33,3 @@ cypress/screenshots/
 
 .firebase/
 .firebaserc
-firebase.json
