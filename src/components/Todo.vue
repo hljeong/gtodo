@@ -282,6 +282,7 @@ const fAddTask = async () => {
   */
   addTask({
     description: promptValue.value.trim(),
+    timeCreated: Date.now(),
     tags: filterTags.value,
   });
   promptValue.value = '';
@@ -401,6 +402,8 @@ const clearAddTagValue = () => {
 
 const onAddTagPressEnter = () => {
   if (addTagValue.value.trim() === '') return;
+  // defer to onAddTagPressSelect()
+  if (allTags.value.includes(addTagValue.value.trim())) return;
   addTag(modalId.value, addTagValue.value.trim());
   clearAddTagValue();
 };
@@ -770,11 +773,16 @@ const finishTaskIfCompleted = async task => {
 };
 
 const finishTask = id => {
+  const timeFinished = Date.now();
   getTask(id).finished = true;
+  getTask(id).timeFinished = timeFinished;
   pinnedTaskIds.value = pinnedTaskIds.value.filter(taskId => taskId !== id);
   updateDisplayedTasks();
 
-  updateTask(id, { finished: true });
+  updateTask(id, {
+    finished: true,
+    timeFinished: timeFinished,
+  });
   // await post(ep_finish, { id: id });
   // await fetchTasks();
 };

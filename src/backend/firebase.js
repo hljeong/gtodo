@@ -67,7 +67,7 @@ const createTask = () => new Promise((resolve) => {
   getCountFromServer(tasksRef).then(
     snapshot => {
       const id = snapshot.data().count + 1;
-      const currentTime = new Date().toLocaleString();
+      const currentTime = Date.now();
       resolve({
         id: id,
         description: '',
