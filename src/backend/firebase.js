@@ -130,13 +130,15 @@ const registerOnce = ({
 }) => {
   return {
     tasks: onSnapshot(tasksRef, (snapshot) => {
-      tasks.value = snapshot.docs.map((doc) => doc.data());
+      tasks.target.value = snapshot.docs.map((doc) => doc.data());
+      tasks.after();
     }),
     persisted: onSnapshot(persistedRef, (snapshot) => {
-      persisted.value = {};
+      persisted.target.value = {};
       for (const doc of snapshot.docs) {
-        persisted.value[doc.id] = doc.data();
+        persisted.target.value[doc.id] = doc.data();
       }
+      persisted.after();
     }),
   }
 };

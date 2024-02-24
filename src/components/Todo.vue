@@ -262,7 +262,10 @@ onMounted(() => {
       addFilterTagOptions.value = allTagOptions.value;
     });
   onSearchStrategyChange();
-  register({ tasks, persisted });
+  register({
+    tasks: { target: tasks, after: updateDisplayedTasks },
+    persisted: { target: persisted, after: updateDisplayedTasks },
+  });
 });
 
 const onPromptChange = updateDisplayedTasks;
