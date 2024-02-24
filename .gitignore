@@ -32,4 +32,3 @@ cypress/screenshots/
 .env*
 
 .firebase/
-.firebaserc
