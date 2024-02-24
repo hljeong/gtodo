@@ -196,7 +196,7 @@ const filterTasks = () => {
 
 const orderTasks = () => {
   // reversed for now, todo: reorder according to policy
-  displayedTasks.value = displayedTasks.value.reverse();
+  displayedTasks.value.sort((task1, task2) => task2.timeCreated - task1.timeCreated);
 
   const displayedpinnedTaskIds = pinnedTaskIds.value.filter(
     taskId => displayedTasks.value.includes(getTask(taskId))

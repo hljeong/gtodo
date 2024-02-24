@@ -34,3 +34,5 @@ cypress/screenshots/
 .firebase/
 .firebaserc
 firebase.json
+
+deploy
