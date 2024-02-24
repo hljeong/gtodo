@@ -47,7 +47,6 @@ const allTasks = ref([]);
 const taskIndex = ref({});
 const displayedTasks = ref([]);
 const unfinishedTasks = ref([]);
-const pinnedTaskIds = ref([]);
 
 const allTags = ref([]);
 const allTagOptions = ref([]);
@@ -198,16 +197,14 @@ const orderTasks = () => {
   // reversed for now, todo: reorder according to policy
   displayedTasks.value.sort((task1, task2) => task2.timeCreated - task1.timeCreated);
 
-  const displayedpinnedTaskIds = pinnedTaskIds.value.filter(
-    taskId => displayedTasks.value.includes(getTask(taskId))
-  ).map(
-    taskId => getTask(taskId)
+  const displayedPinnedTasks = displayedTasks.value.filter(
+    task => task.pinned
   );
-  const displayedUnpinnedTaskIds = displayedTasks.value.filter(
-    task => !pinnedTaskIds.value.includes(task.id)
+  const displayedUnpinnedTasks = displayedTasks.value.filter(
+    task => !task.pinned
   );
-  displayedTasks.value = displayedpinnedTaskIds;
-  displayedTasks.value.push(...displayedUnpinnedTaskIds);
+  displayedTasks.value = displayedPinnedTasks;
+  displayedTasks.value.push(...displayedUnpinnedTasks);
 };
 
 const updateDisplayedTasks = () => {
@@ -776,7 +773,6 @@ const finishTask = id => {
   const timeFinished = Date.now();
   getTask(id).finished = true;
   getTask(id).timeFinished = timeFinished;
-  pinnedTaskIds.value = pinnedTaskIds.value.filter(taskId => taskId !== id);
   updateDisplayedTasks();
 
   updateTask(id, {
@@ -801,17 +797,17 @@ const fDeleteTask = id => {
   */
 };
 
-const isPinned = taskId => pinnedTaskIds.value.includes(taskId);
+const isPinned = taskId => getTask(taskId).pinned;
 
 const pinTask = taskId => {
-  pinnedTaskIds.value.push(taskId)
+  getTask(taskId).pinned = true;
+  updateTask(taskId, { pinned: true });
   updateDisplayedTasks();
 };
 
 const unpinTask = taskId => {
-  pinnedTaskIds.value = pinnedTaskIds.value.filter(
-    pinnedTaskId => pinnedTaskId !== taskId
-  );
+  getTask(taskId).pinned = false;
+  updateTask(taskId, { pinned: false });
   updateDisplayedTasks();
 };
 </script>

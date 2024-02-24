@@ -4,6 +4,7 @@ import {
   collection,
   doc,
   getDoc,
+  getDocs,
   setDoc,
   deleteDoc,
   onSnapshot,
@@ -25,6 +26,7 @@ export const firebaseApp = initializeApp({
   appId: import.meta.env.VITE_FIREBASE_APP_ID,
 });
 
+const auth = getAuth(firebaseApp);
 export let userUid = 'default';
 
 const db = getFirestore(firebaseApp);
@@ -32,7 +34,6 @@ const getTasksRef = (userUid) => collection(db, import.meta.env.VITE_FIREBASE_DA
 let tasksRef = getTasksRef(userUid);
 
 export const signIn = async () => {
-  const auth = getAuth(firebaseApp);
   const provider = new GoogleAuthProvider();
 
   try {
@@ -51,7 +52,6 @@ const registerTasksOnce = (tasks) => onSnapshot(tasksRef, (snapshot) => {
 // register update listener
 export const registerTasks = (tasks) => {
   let unsubscribe = registerTasksOnce(tasks);
-  const auth = getAuth(firebaseApp);
   onAuthStateChanged(auth, (user) => {
     unsubscribe();
     tasksRef = getTasksRef(user.uid);
@@ -59,28 +59,50 @@ export const registerTasks = (tasks) => {
   });
 };
 
+// todo: add 'id's back
+const schema = {
+  description: () => '',
+  finished: () => false,
+  pinned: () => false,
+  deleted: () => false,
+  timeCreated: () => null,
+  timeFinished: () => null,
+  tags: () => [],
+  requirements: () => [],
+  dependents: () => [],
+  parent: () => null,
+  subtasks: () => [],
+};
+
 const getTaskRef = (id) => {
   return doc(tasksRef, id.toString());
 };
+
+const syncSchema = async (user) => {
+  const snapshot = await getDocs(getTasksRef(user.uid));
+  const tasks = snapshot.docs.map((doc) => doc.data());
+  for (const task of tasks) {
+    const syncedTask = { id: task.id };
+    for (const property in schema) {
+      syncedTask[property] = property in task ? task[property] : schema[property]();
+    }
+    setDoc(getTaskRef(task.id), syncedTask);
+  }
+};
+
+onAuthStateChanged(auth, syncSchema);
 
 const createTask = () => new Promise((resolve) => {
   getCountFromServer(tasksRef).then(
     snapshot => {
       const id = snapshot.data().count + 1;
       const currentTime = Date.now();
-      resolve({
-        id: id,
-        description: '',
-        finished: false,
-        deleted: false,
-        timeCreated: currentTime,
-        timeFinished: null,
-        tags: [], // todo: add 'Id's back
-        requirements: [],
-        dependents: [],
-        parent: null,
-        subtasks: [],
-      });
+      const task = { id: id };
+      for (const property in schema) {
+        task[property] = schema[property]();
+      }
+      task.timeCreated = currentTime;
+      resolve(task);
     }
   );
 });
