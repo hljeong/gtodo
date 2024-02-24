@@ -49,29 +49,21 @@ const animate = change => {
 const onBeforeEnter = el => {
   el.style.opacity = 0;
   el.style.height = 0;
+  el.style.padding = '0px 6px';
 };
 
 const onEnter = (el, done) => {
-  const idx = el.dataset.index;
-  const delay = idx * 0.10;
-  const decay = idx * 0.20;
   gsap.to(el, {
     opacity: 1,
     height: 'auto',
-    delay: delay * Math.exp(-decay),
     onComplete: done,
   });
 };
 
 const onLeave = (el, done) => {
-  const idx = el.dataset.index;
-  const delay = idx * 0.10;
-  const decay = idx * 0.20;
   gsap.to(el, {
     opacity: 0,
     height: 0,
-    padding: '0px 6px',
-    delay: delay * Math.exp(-decay),
     onComplete: done,
   });
 };
@@ -85,9 +77,8 @@ const onLeave = (el, done) => {
     @leave="onLeave"
   >
     <div
-      v-for="(task, index) in props.tasks"
+      v-for="task in props.tasks"
       :key="task.id"
-      :data-index="index"
       :data-flip-id="task.id"
       class="
         task-list-item
@@ -144,7 +135,6 @@ const onLeave = (el, done) => {
 
       <Space style="margin-left: auto;">
         <pushpin-outlined
-          v-if="!task.finished"
           :class="
             props.isPinned(task.id) ?
               'icon' :

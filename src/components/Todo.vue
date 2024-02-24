@@ -25,9 +25,10 @@ import {
 import gsap from 'gsap';
 import TaskList from './TaskList.vue';
 import {
-  registerTasks,
+  register,
   addTask,
   updateTask,
+  updateSettings,
   deleteTask,
 } from '../backend/firebase.js';
 
@@ -51,7 +52,6 @@ const unfinishedTasks = ref([]);
 const allTags = ref([]);
 const allTagOptions = ref([]);
 
-const useArbitraryMatch = ref(false);
 const searchStrategy = ref(null);
 
 const promptValue = ref('');
@@ -90,7 +90,17 @@ const addSubtaskOptions = ref([]);
 const addSubtaskValue = ref('');
 const addSubtaskInput = ref(null);
 
+const persisted = ref({
+  settings: {
+    showTags: true,
+    useArbitraryMatch: true,
+    showParents: true,
+    showBlocked: true,
+    showFinished: false,
+  },
+});
 const showTags = ref(true);
+const useArbitraryMatch = ref(true);
 const showParents = ref(true);
 const showBlocked = ref(true);
 const showFinished = ref(false);
@@ -122,7 +132,7 @@ const getTask = id => {
 
 const indexTasks = () => {
   taskIndex.value = {};
-  for (const task of allTasks.value) {
+  for (const task of tasks.value) {
     taskIndex.value[task.id] = task;
   }
 };
@@ -138,7 +148,7 @@ const subtasksFinished = task => task.subtasks.every(
 );
 
 const onSearchStrategyChange = () => {
-  if (useArbitraryMatch.value) {
+  if (persisted.value.settings.useArbitraryMatch) {
     searchStrategy.value = arbitraryMatch;
   } else {
     searchStrategy.value = subsequenceMatch;
@@ -158,7 +168,7 @@ const filterTasks = () => {
   resetTaskFilter();
 
   // filter out parents if not showing them
-  if (!showParents.value) {
+  if (!persisted.value.settings.showParents) {
     const filterOutParents = task => !isParent(task);
     filterTasksBy(filterOutParents);
   }
@@ -181,13 +191,13 @@ const filterTasks = () => {
   filterTasksBy(filterByPrompt);
 
   // filter out finished tasks if not showing them
-  if (!showFinished.value) {
+  if (!persisted.value.settings.showFinished) {
     const filterOutFinished = task => !task.finished;
     filterTasksBy(filterOutFinished);
   }
 
   // filter out blocked tasks if not showing them
-  if (!showBlocked.value) {
+  if (!persisted.value.settings.showBlocked) {
     const filterOutBlocked = requirementsFinished;
     filterTasksBy(filterOutBlocked);
   }
@@ -252,7 +262,7 @@ onMounted(() => {
       addFilterTagOptions.value = allTagOptions.value;
     });
   onSearchStrategyChange();
-  registerTasks(tasks);
+  register({ tasks, persisted });
 });
 
 const onPromptChange = updateDisplayedTasks;
@@ -789,6 +799,8 @@ const fDeleteTask = id => {
   pinnedTaskIds.value = pinnedTaskIds.value.filter(task => task.id !== id);
   updateDisplayedTasks();
   */
+  if (getTask(id).deleted) return;
+  getTask(id).deleted = true;
   deleteTask(id);
   if (modalId.value === id) modalId.value = null;
   /*
@@ -871,7 +883,7 @@ const unpinTask = taskId => {
 
     <TaskList
       :tasks="displayedTasks"
-      :showTags="showTags"
+      :showTags="persisted.settings.showTags"
       :editTask="task => showModal(task.id)"
       :deleteTask="task => fDeleteTask(task.id)"
       :finishTask="finishTask"
@@ -1263,7 +1275,8 @@ const unpinTask = taskId => {
           show tags
         </span>
         <Switch
-          v-model:checked="showTags"
+          v-model:checked="persisted.settings.showTags"
+          @change="(checked) => updateSettings({ showTags: checked })"
         />
       </Space>
 
@@ -1277,8 +1290,11 @@ const unpinTask = taskId => {
           arbitrary match on search
         </span>
         <Switch
-          v-model:checked="useArbitraryMatch"
-          @change="onSearchStrategyChange"
+          v-model:checked="persisted.settings.useArbitraryMatch"
+          @change="(checked) => {
+            updateSettings({ useArbitraryMatch: checked });
+            onSearchStrategyChange()
+          }"
         />
       </Space>
 
@@ -1292,8 +1308,11 @@ const unpinTask = taskId => {
           show parent tasks
         </span>
         <Switch
-          v-model:checked="showParents"
-          @change="updateDisplayedTasks"
+          v-model:checked="persisted.settings.showParents"
+          @change="(checked) => {
+            updateSettings({ showParents: checked });
+            updateDisplayedTasks()
+          }"
         />
       </Space>
 
@@ -1307,8 +1326,11 @@ const unpinTask = taskId => {
           show blocked tasks
         </span>
         <Switch
-          v-model:checked="showBlocked"
-          @change="updateDisplayedTasks"
+          v-model:checked="persisted.settings.showBlocked"
+          @change="(checked) => {
+            updateSettings({ showBlocked: checked });
+            updateDisplayedTasks()
+          }"
         />
       </Space>
 
@@ -1322,8 +1344,11 @@ const unpinTask = taskId => {
           show finished tasks
         </span>
         <Switch
-          v-model:checked="showFinished"
-          @change="updateDisplayedTasks"
+          v-model:checked="persisted.settings.showFinished"
+          @change="(checked) => {
+            updateSettings({ showFinished: checked });
+            updateDisplayedTasks()
+          }"
         />
       </Space>
     </Space>

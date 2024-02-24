@@ -30,8 +30,36 @@ const auth = getAuth(firebaseApp);
 export let userUid = 'default';
 
 const db = getFirestore(firebaseApp);
-const getTasksRef = (userUid) => collection(db, import.meta.env.VITE_FIREBASE_DATABASE, userUid, 'tasks');
+const getTasksRef = (userUid) => collection(
+  db,
+  import.meta.env.VITE_FIREBASE_DATABASE,
+  userUid,
+  'tasks'
+);
+const getPersistedRef = (userUid) => collection(
+  db,
+  import.meta.env.VITE_FIREBASE_DATABASE,
+  userUid,
+  'persisted'
+);
 let tasksRef = getTasksRef(userUid);
+let persistedRef = getPersistedRef(userUid);
+
+const settingsSchema = {
+  showTags: () => true,
+  useArbitraryMatch: () => true,
+  showParents: () => true,
+  showBlocked: () => true,
+  showFinished: () => false,
+};
+
+const generateFromSchema = (schema) => {
+  const generated = {};
+  for (const key in schema) {
+    generated[key] = schema[key]();
+  }
+  return generated;
+};
 
 export const signIn = async () => {
   const provider = new GoogleAuthProvider();
@@ -40,27 +68,14 @@ export const signIn = async () => {
     const result = await signInWithPopup(auth, provider);
     userUid = result.user.uid;
     tasksRef = getTasksRef(userUid);
+    persistedRef = getPersistedRef(userUid);
   } catch(error) {
     console.error(`Failed to sign in: ${error}`);
   }
 };
 
-const registerTasksOnce = (tasks) => onSnapshot(tasksRef, (snapshot) => {
-  tasks.value = snapshot.docs.map((doc) => doc.data());
-});
-
-// register update listener
-export const registerTasks = (tasks) => {
-  let unsubscribe = registerTasksOnce(tasks);
-  onAuthStateChanged(auth, (user) => {
-    unsubscribe();
-    tasksRef = getTasksRef(user.uid);
-    unsubscribe = registerTasksOnce(tasks);
-  });
-};
-
 // todo: add 'id's back
-const schema = {
+const taskSchema = {
   description: () => '',
   finished: () => false,
   pinned: () => false,
@@ -74,33 +89,89 @@ const schema = {
   subtasks: () => [],
 };
 
-const getTaskRef = (id) => {
-  return doc(tasksRef, id.toString());
-};
+const getTaskRef = (id) => doc(tasksRef, id.toString());
 
-const syncSchema = async (user) => {
-  const snapshot = await getDocs(getTasksRef(user.uid));
+const getSettingsRef = () => doc(persistedRef, 'settings');
+
+const syncTaskSchema = async (user) => {
+  tasksRef = getTasksRef(user.uid);
+  const snapshot = await getDocs(tasksRef);
   const tasks = snapshot.docs.map((doc) => doc.data());
   for (const task of tasks) {
     const syncedTask = { id: task.id };
-    for (const property in schema) {
-      syncedTask[property] = property in task ? task[property] : schema[property]();
+    for (const property in taskSchema) {
+      syncedTask[property] = property in task ? task[property] : taskSchema[property]();
     }
     setDoc(getTaskRef(task.id), syncedTask);
   }
 };
 
-onAuthStateChanged(auth, syncSchema);
+const syncSettingsSchema = async (user) => {
+  persistedRef = getPersistedRef(user.uid);
+  const settingsRef = getSettingsRef();
+  const settings = (await getDoc(settingsRef)).data() || {};
+  const syncedSettings = {};
+  for (const setting in settingsSchema) {
+    syncedSettings[setting] = setting in settings ? settings[setting] : settingsSchema[setting]();
+  }
+  setDoc(settingsRef, syncedSettings);
+};
+
+const syncSchemas = async (user) => {
+  await syncTaskSchema(user);
+  await syncSettingsSchema(user);
+};
+
+let cancelAuthListener = onAuthStateChanged(auth, syncSchemas);
+
+const registerOnce = ({
+  tasks,
+  persisted,
+}) => {
+  return {
+    tasks: onSnapshot(tasksRef, (snapshot) => {
+      tasks.value = snapshot.docs.map((doc) => doc.data());
+    }),
+    persisted: onSnapshot(persistedRef, (snapshot) => {
+      persisted.value = {};
+      for (const doc of snapshot.docs) {
+        persisted.value[doc.id] = doc.data();
+      }
+    }),
+  }
+};
+
+// register update listener
+export const register = ({
+  tasks,
+  persisted,
+}) => {
+  let unsubscribe = registerOnce({
+    tasks,
+    persisted,
+  });
+  cancelAuthListener();
+  cancelAuthListener = onAuthStateChanged(auth, async(user) => {
+    for (const listener in unsubscribe) {
+      unsubscribe[listener]();
+    }
+    await syncSchemas(user);
+    tasksRef = getTasksRef(user.uid);
+    persistedRef = getPersistedRef(user.uid);
+    unsubscribe = registerOnce({
+      tasks,
+      persisted,
+    });
+  });
+};
 
 const createTask = () => new Promise((resolve) => {
   getCountFromServer(tasksRef).then(
     snapshot => {
       const id = snapshot.data().count + 1;
       const currentTime = Date.now();
-      const task = { id: id };
-      for (const property in schema) {
-        task[property] = schema[property]();
-      }
+      const task = generateFromSchema(taskSchema);
+      task.id = id;
       task.timeCreated = currentTime;
       resolve(task);
     }
@@ -118,6 +189,13 @@ export const updateTask = async (id, data) => {
   const task = (await getDoc(taskRef)).data();
   const updatedTask = { ...task, ...data };
   return await setDoc(taskRef, updatedTask);
+};
+
+export const updateSettings = async (data) => {
+  const settingsRef = getSettingsRef();
+  const settings = (await getDoc(settingsRef)).data();
+  const updatedSettings = { ...settings, ...data };
+  return await setDoc(settingsRef, updatedSettings);
 };
 
 export const deleteTask = async (id) => {
