@@ -1290,7 +1290,7 @@ const unpinTask = taskId => {
             font-size: 16px;
           "
         >
-          arbitrary match on search
+          arbitrary match
         </span>
         <Switch
           v-model:checked="persisted.settings.useArbitraryMatch"
