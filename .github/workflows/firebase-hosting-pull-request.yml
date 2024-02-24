@@ -9,8 +9,7 @@ permissions:
   pull-requests: write
 jobs:
   build_and_preview:
-    if: '${{ github.repository == "hljeong/gtodo" }}'
-    if: '${{ github.event.pull_request.head.repo.full_name == github.repository }}'
+    if: '${{ github.repository == "hljeong/gtodo" && github.event.pull_request.head.repo.full_name == github.repository }}'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
