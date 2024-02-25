@@ -49,7 +49,8 @@ const taskIndex = ref({});
 const displayedTasks = ref([]);
 const unfinishedTasks = ref([]);
 
-const allTags = ref([]);
+const allTagCounts = ref({});
+const allTagsOrdered = ref([]);
 const allTagOptions = ref([]);
 
 const searchStrategy = ref(null);
@@ -203,6 +204,15 @@ const filterTasks = () => {
   }
 };
 
+const orderTags = (tags) => [
+  ...allTagsOrdered.value.filter(
+    tag => tags.includes(tag)
+  ),
+  ...tags.filter(
+    tag => !allTagsOrdered.value.includes(tag)
+  ),
+];
+
 const orderTasks = () => {
   // reversed for now, todo: reorder according to policy
   displayedTasks.value.sort((task1, task2) => task2.timeCreated - task1.timeCreated);
@@ -223,16 +233,17 @@ const updateDisplayedTasks = () => {
 };
 
 const updateAllTags = () => {
-  allTags.value = [
-    ...new Set(
-      [].concat(
-        ...unfinishedTasks.value.map(
-          task => task.tags
-        )
-      )
-    )
-  ];
-  allTagOptions.value = allTags.value.map(tag => {
+  allTagCounts.value = {};
+  const allTagsFlattened = [].concat(...allTasks.value.map(
+    task => task.tags
+  ));
+  for (const tag of allTagsFlattened) {
+    if (tag in allTagCounts.value) allTagCounts.value[tag] += 1;
+    else allTagCounts.value[tag] = 1;
+  }
+  allTagsOrdered.value = Object.keys(allTagCounts.value);
+  allTagsOrdered.value.sort((tag1, tag2) => allTagCounts.value[tag2] - allTagCounts.value[tag1]);
+  allTagOptions.value = allTagsOrdered.value.map(tag => {
     return { value: tag };
   });
 };
@@ -316,6 +327,7 @@ const onAddFilterTagSelect = (value, option) => {
   if ('value' in option) {
     const tag = option.value;
     filterTags.value.push(tag);
+    filterTags.value = orderTags(filterTags.value);
     updateDisplayedTasks();
   }
   clearAddFilterTagValue();
@@ -389,6 +401,7 @@ const addTag = async (id, tag) => {
   const task = getTask(id);
   // skip check: !task.tags.includes(tag)
   task.tags.push(tag);
+  task.tags = orderTags(task.tags);
   updateTask(id, { tags: task.tags });
 
   // post(ep_add_tag, { id: id, tag: tag })
@@ -413,7 +426,7 @@ const clearAddTagValue = () => {
 const onAddTagPressEnter = () => {
   if (addTagValue.value.trim() === '') return;
   // defer to onAddTagPressSelect()
-  if (allTags.value.includes(addTagValue.value.trim())) return;
+  if (allTagsOrdered.value.includes(addTagValue.value.trim())) return;
   addTag(modalId.value, addTagValue.value.trim());
   clearAddTagValue();
 };
