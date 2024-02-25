@@ -282,9 +282,9 @@ onMounted(() => {
   });
 });
 
-const onPromptChange = updateDisplayedTasks;
+const promptOnChange = updateDisplayedTasks;
 
-const fAddTask = async () => {
+const promptOnPressEnter = async () => {
   if (promptValue.value.trim() === '') return;
 
   // post(ep_add, { description: promptValue.value.trim(), tags: filterTags.value })
@@ -321,7 +321,7 @@ const addFilterTagOnSearch = searchText => {
   );
 };
 
-const clearAddFilterTagValue = () => {
+const addFilterTagClearValue = () => {
   addFilterTagValue.value = '';
   addFilterTagOptions.value = [];
 };
@@ -333,7 +333,7 @@ const addFilterTagOnSelect = (value, option) => {
     filterTags.value = orderTags(filterTags.value);
     updateDisplayedTasks();
   }
-  clearAddFilterTagValue();
+  addFilterTagClearValue();
 };
 
 const addFilterTagOnPressEnter = () => {
@@ -344,7 +344,7 @@ const addFilterTagOnPressEnter = () => {
   filterTags.value.push(tag);
   filterTags.value = orderTags(filterTags.value);
   updateDisplayedTasks();
-  clearAddFilterTagValue();
+  addFilterTagClearValue();
 };
 
 const deleteFilterTag = tag => {
@@ -385,14 +385,14 @@ const showModal = (id) => {
   displayModal.value = true;
 };
 
-const onModalDescriptionClick = async () => {
+const modalDescriptionOnClick = async () => {
   editDescriptionValue.value = getTask(modalId.value).description;
   editDescription.value = true;
   await nextTick();
   editDescriptionInput.value.select();
 };
 
-const onEditDescriptionPressEnter = () => {
+const editDescriptionOnPressEnter = () => {
   const task = getTask(modalId.value);
   if (editDescriptionValue.value.trim() === '') {
     editDescription.value = false;
@@ -406,7 +406,7 @@ const onEditDescriptionPressEnter = () => {
   dummyModalInput.value.focus();
 };
 
-const cancelEditDescription = () => {
+const editDescriptionCancel = () => {
   editDescription.value = false;
   editDescriptionValue.value = '';
 };
@@ -432,17 +432,17 @@ const deleteTag = async (id, tag) => {
   //   .then(fetchTasks);
 };
 
-const clearAddTagValue = () => {
+const addTagClearValue = () => {
   addTagValue.value = '';
   addTagOptions.value = [];
 };
 
-const onAddTagPressEnter = () => {
+const addTagOnPressEnter = () => {
   if (addTagValue.value.trim() === '') return;
   // defer to onAddTagPressSelect()
   if (allTagsOrdered.value.includes(addTagValue.value.trim())) return;
   addTag(modalId.value, addTagValue.value.trim());
-  clearAddTagValue();
+  addTagClearValue();
 };
 
 const getTaskFromDescriptionWithId = description => {
@@ -502,7 +502,7 @@ const arbitraryMatch = function(searchSequence, targetSequence, tags = []) {
   return true;
 };
 
-const onAddTagSearch = searchText => {
+const addTagOnSearch = searchText => {
   addTagOptions.value = allTagOptions.value.filter(
     tag => !getTask(modalId.value).tags.includes(tag.value)
   ).filter(
@@ -510,12 +510,12 @@ const onAddTagSearch = searchText => {
   );
 };
 
-const onAddTagSelect = (value, option) => {
+const addTagOnSelect = (value, option) => {
   addTag(modalId.value, value);
-  clearAddTagValue();
+  addTagClearValue();
 };
 
-const onAddRequirementSearch = searchText => {
+const addRequirementOnSearch = searchText => {
   if (searchText === '') {
     addRequirementOptions.value = [];
     return;
@@ -540,7 +540,7 @@ const onAddRequirementSearch = searchText => {
   );
 };
 
-const onAddDependentSearch = searchText => {
+const addDependentOnSearch = searchText => {
   if (searchText === '') {
     addDependentOptions.value = [];
     return;
@@ -565,17 +565,17 @@ const onAddDependentSearch = searchText => {
   );
 };
 
-const clearAddRequirementValue = () => {
+const addRequirementClearValue = () => {
   addRequirementValue.value = '';
   addRequirementOptions.value = [];
 };
 
-const clearAddDependentValue = () => {
+const addDependentClearValue = () => {
   addDependentValue.value = '';
   addDependentOptions.value = [];
 };
 
-const onAddRequirementSelect = (value, option) => {
+const addRequirementOnSelect = (value, option) => {
   if ('value' in option) {
     const requirement = getTaskFromDescriptionWithId(option.value);
     /*
@@ -593,10 +593,10 @@ const onAddRequirementSelect = (value, option) => {
     requirement.dependents.push(modalId.value);
     updateTask(requirement.id, { dependents: requirement.dependents });
   }
-  clearAddRequirementValue();
+  addRequirementClearValue();
 };
 
-const onAddDependentSelect = (value, option) => {
+const addDependentOnSelect = (value, option) => {
   if ('value' in option) {
     const dependent = getTaskFromDescriptionWithId(option.value);
     /*
@@ -614,10 +614,10 @@ const onAddDependentSelect = (value, option) => {
     dependent.requirements.push(modalId.value);
     updateTask(dependent.id, { requirements: dependent.requirements });
   }
-  clearAddDependentValue();
+  addDependentClearValue();
 };
 
-const onDeleteRequirementClick = id => {
+const deleteRequirementOnClick = id => {
   /*
   post(
     ep_delete_dependency,
@@ -637,7 +637,7 @@ const onDeleteRequirementClick = id => {
   dummyModalInput.value.focus();
 };
 
-const onDeleteDependentClick = id => {
+const deleteDependentOnClick = id => {
   /*
   post(
     ep_delete_dependency,
@@ -657,7 +657,7 @@ const onDeleteDependentClick = id => {
   dummyModalInput.value.focus();
 };
 
-const onSetParentSearch = searchText => {
+const setParentOnSearch = searchText => {
   if (searchText === '') {
     setParentOptions.value = [];
     return;
@@ -682,12 +682,12 @@ const onSetParentSearch = searchText => {
   );
 };
 
-const clearSetParentValue = () => {
+const setParentClearValue = () => {
   setParentValue.value = '';
   setParentOptions.value = [];
 };
 
-const onSetParentSelect = (value, option) => {
+const setParentOnSelect = (value, option) => {
   if ('value' in option) {
     const parent = getTaskFromDescriptionWithId(option.value);
     /*
@@ -705,11 +705,11 @@ const onSetParentSelect = (value, option) => {
     parent.subtasks.push(modalId.value);
     updateTask(parent.id, { subtasks: parent.subtasks });
   }
-  clearSetParentValue();
+  setParentClearValue();
   dummyModalInput.value.focus();
 };
 
-const onDeleteParentClick = () => {
+const deleteParentOnClick = () => {
   /*
   post(
     ep_delete_subtask,
@@ -728,7 +728,7 @@ const onDeleteParentClick = () => {
   dummyModalInput.value.focus();
 };
 
-const onAddSubtaskSearch = searchText => {
+const addSubtaskOnSearch = searchText => {
   if (searchText === '') {
     addSubtaskOptions.value = [];
     return;
@@ -753,12 +753,12 @@ const onAddSubtaskSearch = searchText => {
   );
 };
 
-const clearAddSubtaskValue = () => {
+const addSubtaskClearValue = () => {
   addSubtaskValue.value = '';
   addSubtaskOptions.value = [];
 };
 
-const onAddSubtaskSelect = (value, option) => {
+const addSubtaskOnSelect = (value, option) => {
   if ('value' in option) {
     // todo: use option.id?
     const subtask = getTaskFromDescriptionWithId(option.value);
@@ -777,10 +777,10 @@ const onAddSubtaskSelect = (value, option) => {
     subtask.parent = modalId.value;
     updateTask(subtask.id, { parent: modalId.value });
   }
-  clearAddSubtaskValue();
+  addSubtaskClearValue();
 };
 
-const onDeleteSubtaskClick = id => {
+const deleteSubtaskOnClick = id => {
   /*
   post(
     ep_delete_subtask,
@@ -867,8 +867,8 @@ const unpinTask = taskId => {
         size="large"
         style="fontSize: 24px; height: 56px; width: 100%;"
         allow-clear
-        @change="onPromptChange"
-        @pressEnter="fAddTask"
+        @change="promptOnChange"
+        @pressEnter="promptOnPressEnter"
       />
 
       <Space
@@ -904,7 +904,7 @@ const unpinTask = taskId => {
               size="small"
               style="font-size: 14px; width: 160px"
               @pressEnter="addFilterTagOnPressEnter"
-              @blur="clearAddFilterTagValue"
+              @blur="addFilterTagClearValue"
             />
           </AutoComplete>
         </Tag>
@@ -948,13 +948,13 @@ const unpinTask = taskId => {
               font-size: 20px;
               width: 450px;
             "
-            @pressEnter="onEditDescriptionPressEnter"
-            @blur="cancelEditDescription"
+            @pressEnter="editDescriptionOnPressEnter"
+            @blur="editDescriptionCancel"
           />
           <span
             v-else
             style="font-weight: bold; font-size: 20px;"
-            @click="onModalDescriptionClick()"
+            @click="modalDescriptionOnClick"
           >
             {{ getTask(modalId).description }}
           </span>
@@ -1008,16 +1008,16 @@ const unpinTask = taskId => {
                 style="margin-left: -10px;"
                 :options="addTagOptions"
                 :defaultActiveFirstOption="false"
-                @search="onAddTagSearch"
-                @select="onAddTagSelect"
+                @search="addTagOnSearch"
+                @select="addTagOnSelect"
               >
                 <Input
                   :bordered="false"
                   placeholder="add tag..."
                   size="small"
                   style="font-size: 14px; width: 160px"
-                  @pressEnter="onAddTagPressEnter"
-                  @blur="clearAddTagValue"
+                  @pressEnter="addTagOnPressEnter"
+                  @blur="addTagClearValue"
                 />
               </AutoComplete>
             </Tag>
@@ -1058,7 +1058,7 @@ const unpinTask = taskId => {
                 <close-outlined
                   class="show-on-hover close"
                   style="float: right;"
-                  @click="onDeleteRequirementClick(taskId)"
+                  @click="deleteRequirementOnClick(taskId)"
                 />
               </div>
             </div>
@@ -1069,8 +1069,8 @@ const unpinTask = taskId => {
             v-model:value="addRequirementValue"
             style="width: 100%;"
             :options="addRequirementOptions"
-            @search="onAddRequirementSearch"
-            @select="onAddRequirementSelect"
+            @search="addRequirementOnSearch"
+            @select="addRequirementOnSelect"
           >
             <Input
               class="
@@ -1080,7 +1080,7 @@ const unpinTask = taskId => {
               "
               :bordered="false"
               placeholder="add requirement..."
-              @blur="clearAddRequirementValue"
+              @blur="addRequirementClearValue"
             />
           </AutoComplete>
         </Space>
@@ -1119,7 +1119,7 @@ const unpinTask = taskId => {
                 <close-outlined
                   class="show-on-hover close"
                   style="float: right;"
-                  @click="onDeleteDependentClick(taskId)"
+                  @click="deleteDependentOnClick(taskId)"
                 />
               </div>
             </div>
@@ -1130,8 +1130,8 @@ const unpinTask = taskId => {
             v-model:value="addDependentValue"
             style="width: 100%;"
             :options="addDependentOptions"
-            @search="onAddDependentSearch"
-            @select="onAddDependentSelect"
+            @search="addDependentOnSearch"
+            @select="addDependentOnSelect"
           >
             <Input
               class="
@@ -1141,7 +1141,7 @@ const unpinTask = taskId => {
               "
               :bordered="false"
               placeholder="add dependent..."
-              @blur="clearAddDependentValue"
+              @blur="addDependentClearValue"
             />
           </AutoComplete>
         </Space>
@@ -1180,7 +1180,7 @@ const unpinTask = taskId => {
               <close-outlined
                 class="show-on-hover close"
                 style="float: right;"
-                @click="onDeleteParentClick()"
+                @click="deleteParentOnClick"
               />
             </div>
           </div>
@@ -1191,8 +1191,8 @@ const unpinTask = taskId => {
             v-model:value="setParentValue"
             style="flex: 1;"
             :options="setParentOptions"
-            @search="onSetParentSearch"
-            @select="onSetParentSelect"
+            @search="setParentOnSearch"
+            @select="setParentOnSelect"
           >
             <Input
               class="
@@ -1202,7 +1202,7 @@ const unpinTask = taskId => {
               "
               :bordered="false"
               placeholder="set parent..."
-              @blur="clearSetParentValue"
+              @blur="setParentClearValue"
             />
           </AutoComplete>
         </div>
@@ -1241,7 +1241,7 @@ const unpinTask = taskId => {
                 <close-outlined
                   class="show-on-hover close"
                   style="float: right;"
-                  @click="onDeleteSubtaskClick(taskId)"
+                  @click="deleteSubtaskOnClick(taskId)"
                 />
               </div>
             </div>
@@ -1252,8 +1252,8 @@ const unpinTask = taskId => {
             v-model:value="addSubtaskValue"
             style="width: 100%;"
             :options="addSubtaskOptions"
-            @search="onAddSubtaskSearch"
-            @select="onAddSubtaskSelect"
+            @search="addSubtaskOnSearch"
+            @select="addSubtaskOnSelect"
           >
             <Input
               class="
@@ -1263,7 +1263,7 @@ const unpinTask = taskId => {
               "
               :bordered="false"
               placeholder="add subtask..."
-              @blur="clearAddSubtaskValue"
+              @blur="addSubtaskClearValue"
             />
           </AutoComplete>
         </Space>
