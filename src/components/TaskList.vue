@@ -29,6 +29,7 @@ const props = defineProps([
   'unpinTask',
   'isBlocked',
   'isParent',
+  'getDisplayedTag',
 ]);
 
 const animate = change => {
@@ -126,7 +127,7 @@ const onLeave = (el, done) => {
           wrap
         >
           <Tag v-for="tag of task.tags">
-            {{ tag }}
+            {{ getDisplayedTag(tag) }}
           </Tag>
         </Space>
       </Space>

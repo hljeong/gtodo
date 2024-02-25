@@ -37,6 +37,7 @@ import {
 } from '../backend/firebase.js';
 
 const hierarchicalTagDivider = '/';
+const displayedHierarchicalTagDivider = ' > ';
 
 const ep_tasks = 'http://localhost:3000/v0/tasks'
 const ep_add = 'http://localhost:3000/v0/add'
@@ -263,6 +264,8 @@ const updateDisplayedTasks = () => {
   orderTasks();
 };
 
+const getDisplayedTag = (tag) => tag.replaceAll(hierarchicalTagDivider, displayedHierarchicalTagDivider);
+
 const updateAllTags = () => {
   allTagCounts.value = {};
   const allTagsFlattened = [].concat(...allTasks.value.map(
@@ -276,7 +279,7 @@ const updateAllTags = () => {
   allTagsOrdered.value.sort((tag1, tag2) => allTagCounts.value[tag2] - allTagCounts.value[tag1]);
   allTagOptions.value = allTagsOrdered.value.map(tag => {
     const components = tag.split(hierarchicalTagDivider);
-    let optionLabel = components.map(component => component[0]).join(hierarchicalTagDivider);
+    let optionLabel = components.map(component => component[0]).join(displayedHierarchicalTagDivider);
     optionLabel += components[components.length - 1].substring(1);
     return {
       tag: tag,
@@ -480,7 +483,7 @@ const addTagOnPressEnter = () => {
   const tag = addTagValue.value.trim();
   if (tag === '') return;
   // todo: notify illegal
-  if (tag.includes(' ')) {
+  if (tag.includes(' ') || tag.includes(hierarchicalTagDivider + hierarchicalTagDivider)) {
     addTagClearValue();
     return;
   }
@@ -938,7 +941,7 @@ const exportTasks = () => {
             />
           </template>
 
-          <span style="margin-left: -4px;">{{ tag }}</span>
+          <span style="margin-left: -4px;">{{ getDisplayedTag(tag) }}</span>
         </Tag>
         <Tag>
           <template #icon>
@@ -976,6 +979,7 @@ const exportTasks = () => {
       :unpinTask="unpinTask"
       :isBlocked="task => !requirementsFinished(task)"
       :isParent="isParent"
+      :getDisplayedTag="getDisplayedTag"
     />
 
     <Modal
@@ -1050,7 +1054,7 @@ const exportTasks = () => {
                 />
               </template>
 
-              <span style="margin-left: -4px;">{{ tag }}</span>
+              <span style="margin-left: -4px;">{{ getDisplayedTag(tag) }}</span>
             </Tag>
             <Tag>
               <template #icon>
