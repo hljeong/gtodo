@@ -36,6 +36,8 @@ import {
   deleteTask,
 } from '../backend/firebase.js';
 
+const hierarchicalTagDivider = '/';
+
 const ep_tasks = 'http://localhost:3000/v0/tasks'
 const ep_add = 'http://localhost:3000/v0/add'
 const ep_finish = 'http://localhost:3000/v0/finish';
@@ -155,10 +157,10 @@ const filterTasksBy = filter => {
   displayedTasks.value = displayedTasks.value.filter(filter);
 };
 
-const includesTag = (parent, subtag) => subtag === parent || subtag.startsWith(parent + '/');
+const includesTag = (parent, subtag) => subtag === parent || subtag.startsWith(parent + hierarchicalTagDivider);
 
 const getTagTargetSequence = (tag) => [
-  ...tag.split('/'),
+  ...tag.split(hierarchicalTagDivider),
   tag
 ];
 
@@ -273,8 +275,8 @@ const updateAllTags = () => {
   allTagsOrdered.value = Object.keys(allTagCounts.value);
   allTagsOrdered.value.sort((tag1, tag2) => allTagCounts.value[tag2] - allTagCounts.value[tag1]);
   allTagOptions.value = allTagsOrdered.value.map(tag => {
-    const components = tag.split('/');
-    let optionLabel = components.map(component => component[0]).join('/');
+    const components = tag.split(hierarchicalTagDivider);
+    let optionLabel = components.map(component => component[0]).join(hierarchicalTagDivider);
     optionLabel += components[components.length - 1].substring(1);
     return {
       tag: tag,
@@ -483,7 +485,7 @@ const addTagOnPressEnter = () => {
     return;
   }
   // defer to onAddTagPressSelect()
-  if (getTask(modalId.value).value.includes(tag)) return;
+  if (getTask(modalId.value).tags.includes(tag)) return;
   addTag(modalId.value, tag);
   addTagClearValue();
 };
