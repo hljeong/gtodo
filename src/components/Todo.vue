@@ -313,7 +313,7 @@ const fAddTask = async () => {
   // updateDisplayedTasks();
 };
 
-const onAddFilterTagSearch = searchText => {
+const addFilterTagOnSearch = searchText => {
   addFilterTagOptions.value = allTagOptions.value.filter(
     tag => !filterTags.value.includes(tag.value)
   ).filter(
@@ -326,13 +326,24 @@ const clearAddFilterTagValue = () => {
   addFilterTagOptions.value = [];
 };
 
-const onAddFilterTagSelect = (value, option) => {
+const addFilterTagOnSelect = (value, option) => {
   if ('value' in option) {
     const tag = option.value;
     filterTags.value.push(tag);
     filterTags.value = orderTags(filterTags.value);
     updateDisplayedTasks();
   }
+  clearAddFilterTagValue();
+};
+
+const addFilterTagOnPressEnter = () => {
+  const tag = addFilterTagValue.value.trim();
+  if (tag === '') return;
+  // defer to addFilterTagOnSelect()
+  if (allTagsOrdered.value.includes(tag)) return;
+  filterTags.value.push(tag);
+  filterTags.value = orderTags(filterTags.value);
+  updateDisplayedTasks();
   clearAddFilterTagValue();
 };
 
@@ -884,14 +895,15 @@ const unpinTask = taskId => {
             v-model:value="addFilterTagValue"
             style="margin-left: -10px;"
             :options="addFilterTagOptions"
-            @search="onAddFilterTagSearch"
-            @select="onAddFilterTagSelect"
+            @search="addFilterTagOnSearch"
+            @select="addFilterTagOnSelect"
           >
             <Input
               :bordered="false"
               placeholder="add filter tag..."
               size="small"
               style="font-size: 14px; width: 160px"
+              @pressEnter="addFilterTagOnPressEnter"
               @blur="clearAddFilterTagValue"
             />
           </AutoComplete>
