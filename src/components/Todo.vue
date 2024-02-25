@@ -13,16 +13,20 @@ import {
   Space,
   Switch,
   Tag,
+  Upload,
 } from 'ant-design-vue';
 import {
   CheckOutlined,
   CloseOutlined,
+  ExportOutlined,
   FormOutlined,
+  ImportOutlined,
   LockOutlined,
   PlusOutlined,
   SettingOutlined,
 } from '@ant-design/icons-vue';
 import gsap from 'gsap';
+import { saveAs } from 'file-saver';
 import TaskList from './TaskList.vue';
 import {
   register,
@@ -43,6 +47,8 @@ const ep_delete_tag = 'http://localhost:3000/v0/delete_tag';
 const ep_add_subtask = 'http://localhost:3000/v0/add_subtask';
 const ep_delete_subtask = 'http://localhost:3000/v0/delete_subtask';
 const ep_update = 'http://localhost:3000/v0/update';
+
+const importTasksInput = ref(null);
 
 const allTasks = ref([]);
 const taskIndex = ref({});
@@ -869,6 +875,26 @@ const unpinTask = taskId => {
   updateTask(taskId, { pinned: false });
   updateDisplayedTasks();
 };
+
+const importTasksOnChange = async (event) => {
+  const file = event.target.files.item(0);
+  const content = await file.text();
+  const importedTasks = JSON.parse(content);
+  // todo: validity checks?
+  const idOffset = tasks.value.length;
+  importedTasks.forEach(task => {
+    task.id += idOffset;
+  });
+  for (const task of importedTasks) {
+    addTask(task);
+  }
+};
+
+const exportTasks = () => {
+  const data = JSON.stringify(tasks.value, null, 2);
+  const blob = new Blob([data], { type: 'application/json' });
+  saveAs(blob, 'gtodo-tasks.json');
+};
 </script>
 
 <template>
@@ -1312,12 +1338,35 @@ const unpinTask = taskId => {
       />
 
       <Space class="show-on-hover-1">
-        <span
-          style="
-            font-family: Poppins;
-            font-size: 16px;
-          "
-        >
+        <Input
+          ref="importTasksInput"
+          type="file"
+          style="display: none;"
+          @change="importTasksOnChange"
+        />
+        <span class="setting-label">
+          import tasks
+        </span>
+
+        <import-outlined
+          class="clickable-icon"
+          @click="importTasksInput.$el.click()"
+        />
+      </Space>
+
+      <Space class="show-on-hover-2">
+        <span class="setting-label">
+          export tasks
+        </span>
+
+        <export-outlined
+          class="clickable-icon"
+          @click="exportTasks"
+        />
+      </Space>
+
+      <Space class="show-on-hover-3">
+        <span class="setting-label">
           show tags
         </span>
         <Switch
@@ -1326,13 +1375,8 @@ const unpinTask = taskId => {
         />
       </Space>
 
-      <Space class="show-on-hover-2">
-        <span
-          style="
-            font-family: Poppins;
-            font-size: 16px;
-          "
-        >
+      <Space class="show-on-hover-4">
+        <span class="setting-label">
           search subtasks
         </span>
         <Switch
@@ -1344,13 +1388,8 @@ const unpinTask = taskId => {
         />
       </Space>
 
-      <Space class="show-on-hover-3">
-        <span
-          style="
-            font-family: Poppins;
-            font-size: 16px;
-          "
-        >
+      <Space class="show-on-hover-5">
+        <span class="setting-label">
           show parent tasks
         </span>
         <Switch
@@ -1362,13 +1401,8 @@ const unpinTask = taskId => {
         />
       </Space>
 
-      <Space class="show-on-hover-4">
-        <span
-          style="
-            font-family: Poppins;
-            font-size: 16px;
-          "
-        >
+      <Space class="show-on-hover-6">
+        <span class="setting-label">
           show blocked tasks
         </span>
         <Switch
@@ -1380,13 +1414,8 @@ const unpinTask = taskId => {
         />
       </Space>
 
-      <Space class="show-on-hover-5">
-        <span
-          style="
-            font-family: Poppins;
-            font-size: 16px;
-          "
-        >
+      <Space class="show-on-hover-7">
+        <span class="setting-label">
           show finished tasks
         </span>
         <Switch
@@ -1430,6 +1459,7 @@ const unpinTask = taskId => {
 
 .clickable-icon {
   color: #666;
+  font-size: 1.25rem;
 }
 
 .clickable-icon:hover {
@@ -1484,14 +1514,19 @@ const unpinTask = taskId => {
   transition: opacity 0.5s ease;
 }
 
+.setting-label {
+  font-family: Poppins;
+  font-size: 16px;
+}
+
 .show-on-hover-1 {
   opacity: 0%;
-  transition: opacity 1.5s ease;
+  transition: opacity 1.4s ease;
 }
 
 .child-show-on-hover:hover .show-on-hover-1 {
   opacity: 100%;
-  transition: opacity 0.4s ease;
+  transition: opacity 0.3s ease;
 }
 
 .show-on-hover-2 {
@@ -1501,37 +1536,57 @@ const unpinTask = taskId => {
 
 .child-show-on-hover:hover .show-on-hover-2 {
   opacity: 100%;
-  transition: opacity 0.8s ease;
+  transition: opacity 0.6s ease;
 }
 
 .show-on-hover-3 {
   opacity: 0%;
-  transition: opacity 0.9s ease;
+  transition: opacity 1.0s ease;
 }
 
 .child-show-on-hover:hover .show-on-hover-3 {
   opacity: 100%;
-  transition: opacity 1.2s ease;
+  transition: opacity 0.9s ease;
 }
 
 .show-on-hover-4 {
   opacity: 0%;
-  transition: opacity 0.6s ease;
+  transition: opacity 0.8s ease;
 }
 
 .child-show-on-hover:hover .show-on-hover-4 {
   opacity: 100%;
-  transition: opacity 1.6s ease;
+  transition: opacity 1.2s ease;
 }
 
 .show-on-hover-5 {
   opacity: 0%;
-  transition: opacity 0.3s ease;
+  transition: opacity 0.6s ease;
 }
 
 .child-show-on-hover:hover .show-on-hover-5 {
   opacity: 100%;
-  transition: opacity 2.0s ease;
+  transition: opacity 1.5s ease;
+}
+
+.show-on-hover-6 {
+  opacity: 0%;
+  transition: opacity 0.4s ease;
+}
+
+.child-show-on-hover:hover .show-on-hover-6 {
+  opacity: 100%;
+  transition: opacity 1.8s ease;
+}
+
+.show-on-hover-7 {
+  opacity: 0%;
+  transition: opacity 0.2s ease;
+}
+
+.child-show-on-hover:hover .show-on-hover-7 {
+  opacity: 100%;
+  transition: opacity 2.1s ease;
 }
 
 </style>
