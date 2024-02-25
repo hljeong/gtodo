@@ -474,7 +474,7 @@ const addTagOnPressEnter = () => {
     return;
   }
   // defer to onAddTagPressSelect()
-  if (allTagsOrdered.value.includes(tag)) return;
+  if (getTask(modalId.value).value.includes(tag)) return;
   addTag(modalId.value, tag);
   addTagClearValue();
 };
