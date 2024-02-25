@@ -47,7 +47,6 @@ let persistedRef = getPersistedRef(userUid);
 
 const settingsSchema = {
   showTags: () => true,
-  useArbitraryMatch: () => true,
   searchSubtasks: () => false,
   showParents: () => true,
   showBlocked: () => true,

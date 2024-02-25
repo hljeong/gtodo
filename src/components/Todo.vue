@@ -53,8 +53,6 @@ const allTagCounts = ref({});
 const allTagsOrdered = ref([]);
 const allTagOptions = ref([]);
 
-const searchStrategy = ref(null);
-
 const promptValue = ref('');
 
 const filterTags = ref([]);
@@ -94,7 +92,6 @@ const addSubtaskInput = ref(null);
 const persisted = ref({
   settings: {
     showTags: true,
-    useArbitraryMatch: true,
     searchSubtasks: false,
     showParents: true,
     showBlocked: true,
@@ -144,15 +141,6 @@ const subtasksFinished = task => task.subtasks.every(
   subtask_id => getTask(subtask_id).finished
 );
 
-const searchStrategyOnChange = () => {
-  if (persisted.value.settings.useArbitraryMatch) {
-    searchStrategy.value = arbitraryMatch;
-  } else {
-    searchStrategy.value = subsequenceMatch;
-  }
-  updateDisplayedTasks();
-};
-
 const resetTaskFilter = () => {
   displayedTasks.value = allTasks.value.slice();
 };
@@ -172,6 +160,9 @@ const getTargetSequence = (id) => {
     task => [
       `#${task.id}`,
       ...task.description.split(' '),
+      ...[].concat(...task.tags.map(tag => [
+        ...tag.split('/'),
+      ])),
     ]
   ));
   return targetSequence;
@@ -195,10 +186,9 @@ const filterTasks = () => {
   // filter by prompt
   const promptSequence = promptValue.value.trim().split(' ');
   const filterByPrompt = task => (
-    searchStrategy.value(
+    arbitraryMatch(
       promptSequence,
-      getTargetSequence(task.id),
-      task.tags
+      getTargetSequence(task.id)
     )
   );
   filterTasksBy(filterByPrompt);
@@ -284,7 +274,6 @@ onMounted(() => {
     .then(() => {
       addFilterTagOptions.value = allTagOptions.value;
     });
-  searchStrategyOnChange();
   register({
     tasks: { target: tasks, after: updateDisplayedTasks },
     persisted: { target: persisted, after: updateDisplayedTasks },
@@ -447,10 +436,16 @@ const addTagClearValue = () => {
 };
 
 const addTagOnPressEnter = () => {
-  if (addTagValue.value.trim() === '') return;
+  const tag = addTagValue.value.trim();
+  if (tag === '') return;
+  // todo: notify illegal
+  if (tag.includes(' ')) {
+    addTagClearValue();
+    return;
+  }
   // defer to onAddTagPressSelect()
-  if (allTagsOrdered.value.includes(addTagValue.value.trim())) return;
-  addTag(modalId.value, addTagValue.value.trim());
+  if (allTagsOrdered.value.includes(tag)) return;
+  addTag(modalId.value, tag);
   addTagClearValue();
 };
 
@@ -482,29 +477,11 @@ const isRequirement = (queryTaskId, taskId) => {
 
 const isDependent = (queryTaskId, taskId) => isRequirement(taskId, queryTaskId);
 
-const subsequenceMatch = function(searchSequence, targetSequence, tags = []) {
-  for (let i = 0, j = 0; j < searchSequence.length; ++j) {
-    const searchWord = searchSequence[j];
-    if (tags.some(tag => tag.startsWith(searchWord))) continue;
-    while (
-      i < targetSequence.length &&
-      !targetSequence[i].startsWith(searchWord)
-    ) ++i;
-    if (i === targetSequence.length) return false;
-  }
-  return true;
-};
-
-const arbitraryMatch = function(searchSequence, targetSequence, tags = []) {
+const arbitraryMatch = function(searchSequence, targetSequence) {
   for (const searchWord of searchSequence) {
-    if (
-      !tags.some(
-        tag => tag.startsWith(searchWord)
-      ) &&
-      !targetSequence.some(
-        targetWord => targetWord.startsWith(searchWord)
-      )
-    ) {
+    if (!targetSequence.some(
+      targetWord => targetWord.startsWith(searchWord)
+    )) {
       return false;
     }
   }
@@ -538,7 +515,7 @@ const addRequirementOnSearch = searchText => {
   const searchSequence = searchText.trim().split(' ');
   addRequirementOptions.value = options.filter(
     option => (
-      searchStrategy.value(
+      arbitraryMatch(
         searchSequence,
         option.value.split(' ')
       ) && 
@@ -563,7 +540,7 @@ const addDependentOnSearch = searchText => {
   const searchSequence = searchText.trim().split(' ');
   addDependentOptions.value = options.filter(
     option => (
-      searchStrategy.value(
+      arbitraryMatch(
         searchSequence,
         option.value.split(' ')
       ) && 
@@ -680,7 +657,7 @@ const setParentOnSearch = searchText => {
   const searchSequence = searchText.trim().split(' ');
   setParentOptions.value = options.filter(
     option => (
-      searchStrategy.value(
+      arbitraryMatch(
         searchSequence,
         option.value.split(' ')
       ) && 
@@ -751,7 +728,7 @@ const addSubtaskOnSearch = searchText => {
   const searchSequence = searchText.trim().split(' ');
   addSubtaskOptions.value = options.filter(
     option => (
-      searchStrategy.value(
+      arbitraryMatch(
         searchSequence,
         option.value.split(' ')
       ) && 
@@ -1325,24 +1302,6 @@ const unpinTask = taskId => {
             font-size: 16px;
           "
         >
-          arbitrary match
-        </span>
-        <Switch
-          v-model:checked="persisted.settings.useArbitraryMatch"
-          @change="(checked) => {
-            updateSettings({ useArbitraryMatch: checked });
-            searchStrategyOnChange();
-          }"
-        />
-      </Space>
-
-      <Space class="show-on-hover-3">
-        <span
-          style="
-            font-family: Poppins;
-            font-size: 16px;
-          "
-        >
           search subtasks
         </span>
         <Switch
@@ -1354,7 +1313,7 @@ const unpinTask = taskId => {
         />
       </Space>
 
-      <Space class="show-on-hover-4">
+      <Space class="show-on-hover-3">
         <span
           style="
             font-family: Poppins;
@@ -1372,7 +1331,7 @@ const unpinTask = taskId => {
         />
       </Space>
 
-      <Space class="show-on-hover-5">
+      <Space class="show-on-hover-4">
         <span
           style="
             font-family: Poppins;
@@ -1390,7 +1349,7 @@ const unpinTask = taskId => {
         />
       </Space>
 
-      <Space class="show-on-hover-6">
+      <Space class="show-on-hover-5">
         <span
           style="
             font-family: Poppins;
@@ -1496,7 +1455,7 @@ const unpinTask = taskId => {
 
 .show-on-hover-1 {
   opacity: 0%;
-  transition: opacity 1.8s ease;
+  transition: opacity 1.5s ease;
 }
 
 .child-show-on-hover:hover .show-on-hover-1 {
@@ -1506,7 +1465,7 @@ const unpinTask = taskId => {
 
 .show-on-hover-2 {
   opacity: 0%;
-  transition: opacity 1.5s ease;
+  transition: opacity 1.2s ease;
 }
 
 .child-show-on-hover:hover .show-on-hover-2 {
@@ -1516,7 +1475,7 @@ const unpinTask = taskId => {
 
 .show-on-hover-3 {
   opacity: 0%;
-  transition: opacity 1.2s ease;
+  transition: opacity 0.9s ease;
 }
 
 .child-show-on-hover:hover .show-on-hover-3 {
@@ -1526,7 +1485,7 @@ const unpinTask = taskId => {
 
 .show-on-hover-4 {
   opacity: 0%;
-  transition: opacity 0.9s ease;
+  transition: opacity 0.6s ease;
 }
 
 .child-show-on-hover:hover .show-on-hover-4 {
@@ -1536,22 +1495,12 @@ const unpinTask = taskId => {
 
 .show-on-hover-5 {
   opacity: 0%;
-  transition: opacity 0.6s ease;
+  transition: opacity 0.3s ease;
 }
 
 .child-show-on-hover:hover .show-on-hover-5 {
   opacity: 100%;
   transition: opacity 2.0s ease;
-}
-
-.show-on-hover-6 {
-  opacity: 0%;
-  transition: opacity 0.3s ease;
-}
-
-.child-show-on-hover:hover .show-on-hover-6 {
-  opacity: 100%;
-  transition: opacity 2.4s ease;
 }
 
 </style>
