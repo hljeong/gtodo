@@ -95,16 +95,12 @@ const persisted = ref({
   settings: {
     showTags: true,
     useArbitraryMatch: true,
+    searchSubtasks: false,
     showParents: true,
     showBlocked: true,
     showFinished: false,
   },
 });
-const showTags = ref(true);
-const useArbitraryMatch = ref(true);
-const showParents = ref(true);
-const showBlocked = ref(true);
-const showFinished = ref(false);
 
 const tasks = ref([]);
 watch(tasks, () => fetchTasks());
@@ -148,7 +144,7 @@ const subtasksFinished = task => task.subtasks.every(
   subtask_id => getTask(subtask_id).finished
 );
 
-const onSearchStrategyChange = () => {
+const searchStrategyOnChange = () => {
   if (persisted.value.settings.useArbitraryMatch) {
     searchStrategy.value = arbitraryMatch;
   } else {
@@ -163,6 +159,22 @@ const resetTaskFilter = () => {
 
 const filterTasksBy = filter => {
   displayedTasks.value = displayedTasks.value.filter(filter);
+};
+
+const getTargetSequence = (id) => {
+  const pathFromRoot = [getTask(id)];
+  if (persisted.value.settings.searchSubtasks) {
+    while (pathFromRoot[0].parent !== null) {
+      pathFromRoot.unshift(getTask(pathFromRoot[0].parent));
+    }
+  }
+  const targetSequence = [].concat(...pathFromRoot.map(
+    task => [
+      `#${task.id}`,
+      ...task.description.split(' '),
+    ]
+  ));
+  return targetSequence;
 };
 
 const filterTasks = () => {
@@ -185,10 +197,7 @@ const filterTasks = () => {
   const filterByPrompt = task => (
     searchStrategy.value(
       promptSequence,
-      [
-        `#${task.id}`,
-        ...task.description.split(' ')
-      ],
+      getTargetSequence(task.id),
       task.tags
     )
   );
@@ -275,7 +284,7 @@ onMounted(() => {
     .then(() => {
       addFilterTagOptions.value = allTagOptions.value;
     });
-  onSearchStrategyChange();
+  searchStrategyOnChange();
   register({
     tasks: { target: tasks, after: updateDisplayedTasks },
     persisted: { target: persisted, after: updateDisplayedTasks },
@@ -1322,12 +1331,30 @@ const unpinTask = taskId => {
           v-model:checked="persisted.settings.useArbitraryMatch"
           @change="(checked) => {
             updateSettings({ useArbitraryMatch: checked });
-            onSearchStrategyChange()
+            searchStrategyOnChange();
           }"
         />
       </Space>
 
       <Space class="show-on-hover-3">
+        <span
+          style="
+            font-family: Poppins;
+            font-size: 16px;
+          "
+        >
+          search subtasks
+        </span>
+        <Switch
+          v-model:checked="persisted.settings.searchSubtasks"
+          @change="(checked) => {
+            updateSettings({ searchSubtasks: checked });
+            updateDisplayedTasks();
+          }"
+        />
+      </Space>
+
+      <Space class="show-on-hover-4">
         <span
           style="
             font-family: Poppins;
@@ -1340,12 +1367,12 @@ const unpinTask = taskId => {
           v-model:checked="persisted.settings.showParents"
           @change="(checked) => {
             updateSettings({ showParents: checked });
-            updateDisplayedTasks()
+            updateDisplayedTasks();
           }"
         />
       </Space>
 
-      <Space class="show-on-hover-4">
+      <Space class="show-on-hover-5">
         <span
           style="
             font-family: Poppins;
@@ -1358,12 +1385,12 @@ const unpinTask = taskId => {
           v-model:checked="persisted.settings.showBlocked"
           @change="(checked) => {
             updateSettings({ showBlocked: checked });
-            updateDisplayedTasks()
+            updateDisplayedTasks();
           }"
         />
       </Space>
 
-      <Space class="show-on-hover-5">
+      <Space class="show-on-hover-6">
         <span
           style="
             font-family: Poppins;
@@ -1376,7 +1403,7 @@ const unpinTask = taskId => {
           v-model:checked="persisted.settings.showFinished"
           @change="(checked) => {
             updateSettings({ showFinished: checked });
-            updateDisplayedTasks()
+            updateDisplayedTasks();
           }"
         />
       </Space>
@@ -1469,7 +1496,7 @@ const unpinTask = taskId => {
 
 .show-on-hover-1 {
   opacity: 0%;
-  transition: opacity 1.5s ease;
+  transition: opacity 1.8s ease;
 }
 
 .child-show-on-hover:hover .show-on-hover-1 {
@@ -1479,7 +1506,7 @@ const unpinTask = taskId => {
 
 .show-on-hover-2 {
   opacity: 0%;
-  transition: opacity 1.2s ease;
+  transition: opacity 1.5s ease;
 }
 
 .child-show-on-hover:hover .show-on-hover-2 {
@@ -1489,7 +1516,7 @@ const unpinTask = taskId => {
 
 .show-on-hover-3 {
   opacity: 0%;
-  transition: opacity 0.9s ease;
+  transition: opacity 1.2s ease;
 }
 
 .child-show-on-hover:hover .show-on-hover-3 {
@@ -1499,7 +1526,7 @@ const unpinTask = taskId => {
 
 .show-on-hover-4 {
   opacity: 0%;
-  transition: opacity 0.6s ease;
+  transition: opacity 0.9s ease;
 }
 
 .child-show-on-hover:hover .show-on-hover-4 {
@@ -1509,12 +1536,22 @@ const unpinTask = taskId => {
 
 .show-on-hover-5 {
   opacity: 0%;
-  transition: opacity 0.3s ease;
+  transition: opacity 0.6s ease;
 }
 
 .child-show-on-hover:hover .show-on-hover-5 {
   opacity: 100%;
   transition: opacity 2.0s ease;
+}
+
+.show-on-hover-6 {
+  opacity: 0%;
+  transition: opacity 0.3s ease;
+}
+
+.child-show-on-hover:hover .show-on-hover-6 {
+  opacity: 100%;
+  transition: opacity 2.4s ease;
 }
 
 </style>
