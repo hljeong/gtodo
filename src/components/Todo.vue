@@ -273,7 +273,13 @@ const updateAllTags = () => {
   allTagsOrdered.value = Object.keys(allTagCounts.value);
   allTagsOrdered.value.sort((tag1, tag2) => allTagCounts.value[tag2] - allTagCounts.value[tag1]);
   allTagOptions.value = allTagsOrdered.value.map(tag => {
-    return { value: tag };
+    const components = tag.split('/');
+    let optionLabel = components.map(component => component[0]).join('/');
+    optionLabel += components[components.length - 1].substring(1);
+    return {
+      tag: tag,
+      value: optionLabel,
+    };
   });
 };
 
@@ -344,9 +350,9 @@ const addFilterTagOnSearch = searchText => {
     tagOption => (
       arbitraryMatch(
         searchSequence,
-        getTagTargetSequence(tagOption.value)
+        getTagTargetSequence(tagOption.tag)
       ) && 
-      !filterTags.value.includes(tagOption.value)
+      !filterTags.value.includes(tagOption.tag)
     )
   );
 };
@@ -358,7 +364,7 @@ const addFilterTagClearValue = () => {
 
 const addFilterTagOnSelect = (value, option) => {
   if ('value' in option) {
-    const tag = option.value;
+    const tag = option.tag;
     filterTags.value.push(tag);
     filterTags.value = orderTags(filterTags.value);
     updateDisplayedTasks();
@@ -527,17 +533,17 @@ const addTagOnSearch = searchText => {
     tagOption => (
       arbitraryMatch(
         searchSequence,
-        getTagTargetSequence(tagOption.value)
+        getTagTargetSequence(tagOption.tag)
       ) && 
       !getTask(modalId.value).tags.some(
-        taskTag => includesTag(tagOption.value, taskTag)
+        taskTag => includesTag(tagOption.tag, taskTag)
       )
     )
   );
 };
 
 const addTagOnSelect = (value, option) => {
-  addTag(modalId.value, value);
+  addTag(modalId.value, option.tag);
   addTagClearValue();
 };
 
