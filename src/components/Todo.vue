@@ -157,7 +157,10 @@ const filterTasksBy = filter => {
 
 const includesTag = (parent, subtag) => subtag === parent || subtag.startsWith(parent + '/');
 
-const getTagTargetSequence = (tag) => [...tag.split('/')];
+const getTagTargetSequence = (tag) => [
+  ...tag.split('/'),
+  tag
+];
 
 const getTaskTargetSequence = (id) => {
   const pathFromRoot = [getTask(id)];

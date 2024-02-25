@@ -93,6 +93,15 @@ const getTaskRef = (id) => doc(tasksRef, id.toString());
 
 const getSettingsRef = () => doc(persistedRef, 'settings');
 
+const needsUpdate = (original, synced) => {
+  const originalKeys = Object.keys(original);
+  const syncedKeys = Object.keys(synced);
+  if (originalKeys.length !== syncedKeys.length) return true;
+  return originalKeys.some(
+    key => !syncedKeys.includes(key)
+  );
+};
+
 const syncTaskSchema = async (user) => {
   tasksRef = getTasksRef(user.uid);
   const snapshot = await getDocs(tasksRef);
@@ -102,7 +111,11 @@ const syncTaskSchema = async (user) => {
     for (const property in taskSchema) {
       syncedTask[property] = property in task ? task[property] : taskSchema[property]();
     }
-    setDoc(getTaskRef(task.id), syncedTask);
+    if (needsUpdate(task, syncedTask)) {
+      console.log(`task #${task.id} schema out of sync, syncing...`);
+      await setDoc(getTaskRef(task.id), syncedTask);
+      console.log(`task #${task.id} schema synced`)
+    }
   }
 };
 
@@ -114,7 +127,11 @@ const syncSettingsSchema = async (user) => {
   for (const setting in settingsSchema) {
     syncedSettings[setting] = setting in settings ? settings[setting] : settingsSchema[setting]();
   }
-  setDoc(settingsRef, syncedSettings);
+  if (needsUpdate(settings, syncedSettings)) {
+    console.log(`settings schema out of sync, syncing...`);
+    await setDoc(settingsRef, syncedSettings);
+      console.log(`settings schema synced`)
+  }
 };
 
 const syncSchemas = async (user) => {
