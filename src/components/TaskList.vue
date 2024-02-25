@@ -27,10 +27,8 @@ const props = defineProps([
   'finishTask',
   'pinTask',
   'unpinTask',
-  'taskExists',
   'isBlocked',
   'isParent',
-  'isPinned',
 ]);
 
 const animate = change => {
@@ -136,12 +134,12 @@ const onLeave = (el, done) => {
       <Space style="margin-left: auto;">
         <pushpin-outlined
           :class="
-            props.isPinned(task.id) ?
+            task.pinned ?
               'icon' :
               'show-on-hover clickable-icon'
           "
           @click="
-            props.isPinned(task.id) ?
+            task.pinned ?
               animate(() => props.unpinTask(task.id)) :
               animate(() => props.pinTask(task.id))
           "
@@ -155,8 +153,8 @@ const onLeave = (el, done) => {
         <close-outlined
           class="show-on-hover clickable-icon"
           @click="
-            props.taskExists(task) ?
-              props.deleteTask(task) : null
+            task.deleted ?
+              null : props.deleteTask(task)
           "
         />
       </Space>

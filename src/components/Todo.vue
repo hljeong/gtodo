@@ -797,11 +797,14 @@ const finishTaskIfCompleted = async task => {
 
 const finishTask = id => {
   const timeFinished = Date.now();
-  getTask(id).finished = true;
-  getTask(id).timeFinished = timeFinished;
+  const task = getTask(id);
+  task.pinned = false;
+  task.finished = true;
+  task.timeFinished = timeFinished;
   updateDisplayedTasks();
 
   updateTask(id, {
+    pinned: false,
     finished: true,
     timeFinished: timeFinished,
   });
@@ -815,7 +818,6 @@ const fDeleteTask = id => {
   pinnedTaskIds.value = pinnedTaskIds.value.filter(task => task.id !== id);
   updateDisplayedTasks();
   */
-  if (getTask(id).deleted) return;
   getTask(id).deleted = true;
   deleteTask(id);
   if (modalId.value === id) modalId.value = null;
@@ -824,8 +826,6 @@ const fDeleteTask = id => {
     .then(fetchTasks);
   */
 };
-
-const isPinned = taskId => getTask(taskId).pinned;
 
 const pinTask = taskId => {
   getTask(taskId).pinned = true;
@@ -905,10 +905,8 @@ const unpinTask = taskId => {
       :finishTask="finishTask"
       :pinTask="pinTask"
       :unpinTask="unpinTask"
-      :taskExists="task => allTasks.includes(task)"
       :isBlocked="task => !requirementsFinished(task)"
       :isParent="isParent"
-      :isPinned="isPinned"
     />
 
     <Modal
