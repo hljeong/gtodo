@@ -149,7 +149,11 @@ const filterTasksBy = filter => {
   displayedTasks.value = displayedTasks.value.filter(filter);
 };
 
-const getTargetSequence = (id) => {
+const includesTag = (parent, subtag) => subtag === parent || subtag.startsWith(parent + '/');
+
+const getTagTargetSequence = (tag) => [...tag.split('/')];
+
+const getTaskTargetSequence = (id) => {
   const pathFromRoot = [getTask(id)];
   if (persisted.value.settings.searchSubtasks) {
     while (pathFromRoot[0].parent !== null) {
@@ -160,9 +164,7 @@ const getTargetSequence = (id) => {
     task => [
       `#${task.id}`,
       ...task.description.split(' '),
-      ...[].concat(...task.tags.map(tag => [
-        ...tag.split('/'),
-      ])),
+      ...[].concat(...task.tags.map(getTagTargetSequence)),
     ]
   ));
   return targetSequence;
@@ -179,7 +181,9 @@ const filterTasks = () => {
 
   // filter by tags
   const filterByTags = task => filterTags.value.every(
-    tag => task.tags.includes(tag)
+    filterTag => task.tags.some(
+      taskTag => includesTag(filterTag, taskTag)
+    )
   );
   filterTasksBy(filterByTags);
 
@@ -188,7 +192,7 @@ const filterTasks = () => {
   const filterByPrompt = task => (
     arbitraryMatch(
       promptSequence,
-      getTargetSequence(task.id)
+      getTaskTargetSequence(task.id)
     )
   );
   filterTasksBy(filterByPrompt);
@@ -204,6 +208,20 @@ const filterTasks = () => {
     const filterOutBlocked = requirementsFinished;
     filterTasksBy(filterOutBlocked);
   }
+};
+
+const deduplicateTags = (tags) => {
+  let deduplicatedTags = [];
+  for (const tag of tags) {
+    if (deduplicatedTags.some(
+      existingTag => includesTag(tag, existingTag)
+    )) continue;
+    deduplicatedTags = deduplicatedTags.filter(
+      existingTag => !includesTag(existingTag, tag)
+    )
+    deduplicatedTags.push(tag);
+  }
+  return deduplicatedTags;
 };
 
 const orderTags = (tags) => [
@@ -312,10 +330,15 @@ const promptOnPressEnter = async () => {
 };
 
 const addFilterTagOnSearch = searchText => {
+  const searchSequence = searchText.trim().split(' ');
   addFilterTagOptions.value = allTagOptions.value.filter(
-    tag => !filterTags.value.includes(tag.value)
-  ).filter(
-    tag => tag.value.startsWith(searchText)
+    tagOption => (
+      arbitraryMatch(
+        searchSequence,
+        getTagTargetSequence(tagOption.value)
+      ) && 
+      !filterTags.value.includes(tagOption.value)
+    )
   );
 };
 
@@ -413,6 +436,7 @@ const addTag = async (id, tag) => {
   const task = getTask(id);
   // skip check: !task.tags.includes(tag)
   task.tags.push(tag);
+  task.tags = deduplicateTags(task.tags);
   task.tags = orderTags(task.tags);
   updateTask(id, { tags: task.tags });
 
@@ -489,10 +513,17 @@ const arbitraryMatch = function(searchSequence, targetSequence) {
 };
 
 const addTagOnSearch = searchText => {
+  const searchSequence = searchText.trim().split(' ');
   addTagOptions.value = allTagOptions.value.filter(
-    tag => !getTask(modalId.value).tags.includes(tag.value)
-  ).filter(
-    tag => tag.value.startsWith(searchText)
+    tagOption => (
+      arbitraryMatch(
+        searchSequence,
+        getTagTargetSequence(tagOption.value)
+      ) && 
+      !getTask(modalId.value).tags.some(
+        taskTag => includesTag(tagOption.value, taskTag)
+      )
+    )
   );
 };
 
