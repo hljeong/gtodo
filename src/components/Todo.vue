@@ -185,7 +185,10 @@ const filterTasks = () => {
   const filterByPrompt = task => (
     searchStrategy.value(
       promptSequence,
-      task.description.split(' '),
+      [
+        `#${task.id}`,
+        ...task.description.split(' ')
+      ],
       task.tags
     )
   );
