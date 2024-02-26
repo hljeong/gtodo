@@ -1407,7 +1407,7 @@ const exportTasks = () => {
 
       <Space class="show-on-hover-5">
         <span class="setting-label">
-          show parent tasks
+          show parents
         </span>
         <Switch
           v-model:checked="persisted.settings.showParents"
@@ -1420,7 +1420,7 @@ const exportTasks = () => {
 
       <Space class="show-on-hover-6">
         <span class="setting-label">
-          show blocked tasks
+          show blocked
         </span>
         <Switch
           v-model:checked="persisted.settings.showBlocked"
@@ -1433,7 +1433,7 @@ const exportTasks = () => {
 
       <Space class="show-on-hover-7">
         <span class="setting-label">
-          show finished tasks
+          show finished
         </span>
         <Switch
           v-model:checked="persisted.settings.showFinished"
