@@ -487,8 +487,8 @@ const addTagOnPressEnter = () => {
     addTagClearValue();
     return;
   }
-  // defer to onAddTagPressSelect()
-  if (getTask(modalId.value).tags.includes(tag)) return;
+  // defer to addTagOnSelect()
+  if (allTagsOrdered.value.includes(tag)) return;
   addTag(modalId.value, tag);
   addTagClearValue();
 };
@@ -548,7 +548,9 @@ const addTagOnSearch = searchText => {
 };
 
 const addTagOnSelect = (value, option) => {
-  addTag(modalId.value, option.tag);
+  if ('value' in option) {
+    addTag(modalId.value, option.tag);
+  }
   addTagClearValue();
 };
 
