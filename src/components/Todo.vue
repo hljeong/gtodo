@@ -312,9 +312,28 @@ onMounted(() => {
     .then(() => {
       addFilterTagOptions.value = allTagOptions.value;
     });
+
   register({
     tasks: { target: tasks, after: updateDisplayedTasks },
     persisted: { target: persisted, after: updateDisplayedTasks },
+  });
+
+  // global escape listener
+  // activate only when modal is not displayed
+  window.addEventListener('keydown', (e) => {
+    if (e.key == 'Escape' && !displayModal.value) {
+
+      // clear todo bar if not empty
+      if (promptValue.value !== '') {
+        promptValue.value = '';
+        updateDisplayedTasks();
+
+      // clear filter tags if todo bar empty
+      } else if (filterTags.value.length !== 0) {
+        filterTags.value = [];
+        updateDisplayedTasks();
+      }
+    }
   });
 });
 
