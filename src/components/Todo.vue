@@ -10,6 +10,8 @@ import {
   AutoComplete,
   Input,
   Modal,
+  Select,
+  SelectOption,
   Space,
   Switch,
   Tag,
@@ -66,7 +68,7 @@ const promptValue = ref('');
 
 const filterTags = ref([]);
 const addFilterTagOptions = ref([]);
-const addFilterTagValue = ref('');
+const addFilterTagHasFocus = ref(false);
 
 const displayModal = ref(false);
 const modalId = ref(null);
@@ -76,6 +78,7 @@ const editDescription = ref(false);
 const editDescriptionInput = ref(null);
 const editDescriptionValue = ref('');
 
+const modalTags = ref([]);
 const addTagOptions = ref([]);
 const addTagValue = ref('');
 
@@ -192,11 +195,13 @@ const filterTasks = () => {
   }
 
   // filter by tags
-  const filterByTags = task => filterTags.value.every(
-    filterTag => task.tags.some(
-      taskTag => includesTag(filterTag, taskTag)
-    )
-  );
+  const filterByTags = task => filterTags.value.length === 0 ?
+    true :
+    filterTags.value.some(
+      filterTag => task.tags.some(
+        taskTag => includesTag(filterTag, taskTag)
+      )
+    );
   filterTasksBy(filterByTags);
 
   // filter by prompt
@@ -221,6 +226,13 @@ const filterTasks = () => {
     filterTasksBy(filterOutBlocked);
   }
 };
+
+const removeInvalidTags = (tags) => tags.filter(
+  (tag) => (
+    !tag.includes(' ') &&
+    !tag.includes(hierarchicalTagDivider + hierarchicalTagDivider)
+  )
+);
 
 const deduplicateTags = (tags) => {
   let deduplicatedTags = [];
@@ -279,12 +291,21 @@ const updateAllTags = () => {
   allTagsOrdered.value.sort((tag1, tag2) => allTagCounts.value[tag2] - allTagCounts.value[tag1]);
   allTagOptions.value = allTagsOrdered.value.map(tag => {
     const components = tag.split(hierarchicalTagDivider);
+    /*
     let optionLabel = components.map(component => component[0]).join(displayedHierarchicalTagDivider);
     optionLabel += components[components.length - 1].substring(1);
+    */
+    /*
     return {
       tag: tag,
       value: optionLabel,
     };
+    */
+    const optionLabel = getDisplayedTag(tag);
+    return {
+      label: optionLabel,
+      value: tag,
+    }
   });
 };
 
@@ -308,20 +329,22 @@ const fetchTasks = async () => {
 };
 
 onMounted(() => {
-  fetchTasks()
-    .then(() => {
-      addFilterTagOptions.value = allTagOptions.value;
-    });
 
+  // register listeners
   register({
     tasks: { target: tasks, after: updateDisplayedTasks },
     persisted: { target: persisted, after: updateDisplayedTasks },
   });
 
   // global escape listener
-  // activate only when modal is not displayed
+  // activate only when modal is not displayed and
+  // filter tag input is not focused
   window.addEventListener('keydown', (e) => {
-    if (e.key == 'Escape' && !displayModal.value) {
+    if (
+      e.key == 'Escape' &&
+      !displayModal.value &&
+      !addFilterTagHasFocus.value
+    ) {
 
       // clear todo bar if not empty
       if (promptValue.value !== '') {
@@ -368,50 +391,50 @@ const promptOnPressEnter = async () => {
   // updateDisplayedTasks();
 };
 
-const addFilterTagOnSearch = searchText => {
+// applied to all lists of tags
+const processTags = (tags) => orderTags(
+  deduplicateTags(
+    removeInvalidTags(
+      tags
+    )
+  )
+);
+
+const searchTags = (searchText, options, tags) => {
   const searchSequence = searchText.trim().split(' ');
-  addFilterTagOptions.value = allTagOptions.value.filter(
+  options.value = allTagOptions.value.filter(
     tagOption => (
       arbitraryMatch(
         searchSequence,
-        getTagTargetSequence(tagOption.tag)
-      ) && 
-      !filterTags.value.includes(tagOption.tag)
+        getTagTargetSequence(tagOption.value)
+      ) &&
+      // no tags on lineages of existing tags
+      !tags.value.some((tag) => 
+        includesTag(tag, tagOption.value) ||
+        includesTag(tagOption.value, tag)
+      )
     )
   );
+}
+
+// update focus state and generate options list
+const addFilterTagOnFocus = () => {
+  addFilterTagHasFocus.value = true;
+  addFilterTagOnSearch('');
 };
 
-const addFilterTagClearValue = () => {
-  addFilterTagValue.value = '';
-  addFilterTagOptions.value = [];
+const addFilterTagOnSearch = searchText => {
+  searchTags(searchText, addFilterTagOptions, filterTags);
 };
 
-const addFilterTagOnSelect = (value, option) => {
-  if ('value' in option) {
-    const tag = option.tag;
-    filterTags.value.push(tag);
-    filterTags.value = orderTags(filterTags.value);
-    updateDisplayedTasks();
-  }
-  addFilterTagClearValue();
-};
-
-const addFilterTagOnPressEnter = () => {
-  const tag = addFilterTagValue.value.trim();
-  if (tag === '') return;
-  // defer to addFilterTagOnSelect()
-  if (allTagsOrdered.value.includes(tag)) return;
-  filterTags.value.push(tag);
-  filterTags.value = orderTags(filterTags.value);
+const addFilterTagOnChange = () => {
+  filterTags.value = processTags(filterTags.value);
   updateDisplayedTasks();
-  addFilterTagClearValue();
+  addFilterTagOnSearch('');
 };
 
-const deleteFilterTag = tag => {
-  filterTags.value = filterTags.value.filter(
-    filterTag => filterTag !== tag
-  );
-  updateDisplayedTasks();
+const addFilterTagOnBlur = () => {
+  addFilterTagHasFocus.value = false;
 };
 
 const showModal = (id) => {
@@ -421,7 +444,7 @@ const showModal = (id) => {
   editDescription.value = false;
   editDescriptionValue.value = task.description;
 
-  addTagValue.value = '';
+  modalTags.value = task.tags;
   addTagOptions.value = allTagOptions.value.filter(
     tag => !task.tags.includes(tag.value)
   );
@@ -471,45 +494,18 @@ const editDescriptionCancel = () => {
   editDescriptionValue.value = '';
 };
 
-const addTag = async (id, tag) => {
-  const task = getTask(id);
-  // skip check: !task.tags.includes(tag)
-  task.tags.push(tag);
-  task.tags = deduplicateTags(task.tags);
-  task.tags = orderTags(task.tags);
-  updateTask(id, { tags: task.tags });
-
-  // post(ep_add_tag, { id: id, tag: tag })
-  //   .then(fetchTasks);
+const addTagOnFocus = () => {
+  addTagOnSearch('');
 };
 
-const deleteTag = async (id, tag) => {
-  const task = getTask(id);
-  // skip check: task.tags.includes(tag)
-  task.tags = task.tags.filter(taskTag => taskTag !== tag);
-  updateTask(id, { tags: task.tags });
-
-  // post(ep_delete_tag, { id: id, tag: tag })
-  //   .then(fetchTasks);
+const addTagOnSearch = (searchText) => {
+  searchTags(searchText, addTagOptions, modalTags);
 };
 
-const addTagClearValue = () => {
-  addTagValue.value = '';
-  addTagOptions.value = [];
-};
-
-const addTagOnPressEnter = () => {
-  const tag = addTagValue.value.trim();
-  if (tag === '') return;
-  // todo: notify illegal
-  if (tag.includes(' ') || tag.includes(hierarchicalTagDivider + hierarchicalTagDivider)) {
-    addTagClearValue();
-    return;
-  }
-  // defer to addTagOnSelect()
-  if (allTagsOrdered.value.includes(tag)) return;
-  addTag(modalId.value, tag);
-  addTagClearValue();
+const addTagOnChange = () => {
+  modalTags.value = processTags(modalTags.value);
+  updateTask(modalId.value, { tags: modalTags.value });
+  addTagOnSearch('');
 };
 
 const getTaskFromDescriptionWithId = description => {
@@ -549,28 +545,6 @@ const arbitraryMatch = function(searchSequence, targetSequence) {
     }
   }
   return true;
-};
-
-const addTagOnSearch = searchText => {
-  const searchSequence = searchText.trim().split(' ');
-  addTagOptions.value = allTagOptions.value.filter(
-    tagOption => (
-      arbitraryMatch(
-        searchSequence,
-        getTagTargetSequence(tagOption.tag)
-      ) && 
-      !getTask(modalId.value).tags.some(
-        taskTag => includesTag(tagOption.tag, taskTag)
-      )
-    )
-  );
-};
-
-const addTagOnSelect = (value, option) => {
-  if ('value' in option) {
-    addTag(modalId.value, option.tag);
-  }
-  addTagClearValue();
 };
 
 const addRequirementOnSearch = searchText => {
@@ -950,44 +924,24 @@ const exportTasks = () => {
         @pressEnter="promptOnPressEnter"
       />
 
-      <Space
-        :size="[0, 8]"
-        wrap
+      <Select
+        v-model:value="filterTags"
+        mode="tags"
+        style="width: 100%;"
+        placeholder="add filter tag..."
+        notFoundContent=""
+        :options="addFilterTagOptions"
+        @focus="addFilterTagOnFocus"
+        @search="addFilterTagOnSearch"
+        @change="addFilterTagOnChange"
+        @blur="addFilterTagOnBlur"
       >
-        <Tag v-for="tag of filterTags">
-          <template #icon>
-            <close-outlined
-              class="hover-highlight close"
-              style="font-size: 10px;"
-              @click="deleteFilterTag(tag)"
-            />
-          </template>
-
-          <span style="margin-left: -4px;">{{ getDisplayedTag(tag) }}</span>
-        </Tag>
-        <Tag>
-          <template #icon>
-            <plus-outlined style="font-size: 12px;" />
-          </template>
-
-          <AutoComplete
-            v-model:value="addFilterTagValue"
-            style="margin-left: -10px;"
-            :options="addFilterTagOptions"
-            @search="addFilterTagOnSearch"
-            @select="addFilterTagOnSelect"
-          >
-            <Input
-              :bordered="false"
-              placeholder="add filter tag..."
-              size="small"
-              style="font-size: 14px; width: 160px"
-              @pressEnter="addFilterTagOnPressEnter"
-              @blur="addFilterTagClearValue"
-            />
-          </AutoComplete>
-        </Tag>
-      </Space>
+        <template #tagRender="{ label: tag, onClose }">
+          <Tag closable style="margin-right: 3px" @close="onClose">
+            {{ getDisplayedTag(tag) }}
+          </Tag>
+        </template>
+      </Select>
     </Space>
     <div style="height: 30px" />
 
@@ -1059,6 +1013,25 @@ const exportTasks = () => {
             tags:
           </h4>
 
+          <Select
+            v-model:value="modalTags"
+            mode="tags"
+            style="width: 100%;"
+            placeholder="add tag..."
+            notFoundContent=""
+            :options="addTagOptions"
+            @focus="addTagOnFocus"
+            @search="addTagOnSearch"
+            @change="addTagOnChange"
+          >
+            <template #tagRender="{ label: tag, onClose }">
+              <Tag closable style="margin-right: 3px" @close="onClose">
+                {{ getDisplayedTag(tag) }}
+              </Tag>
+            </template>
+          </Select>
+
+          <!--
           <Space
             class="rounded-corners"
             :size="[0, 8]"
@@ -1102,6 +1075,7 @@ const exportTasks = () => {
               </AutoComplete>
             </Tag>
           </Space>
+          -->
         </Space>
 
         <Space
@@ -1624,6 +1598,15 @@ const exportTasks = () => {
 .child-show-on-hover:hover .show-on-hover-7 {
   opacity: 100%;
   transition: opacity 2.1s ease;
+}
+
+</style>
+
+<style>
+
+/* why cant i change this in the component??? 😡😡 */
+.ant-select-selection-search-input {
+  font-size: 16px;
 }
 
 </style>
