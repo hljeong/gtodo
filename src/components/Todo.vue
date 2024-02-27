@@ -53,6 +53,8 @@ const ep_add_subtask = 'http://localhost:3000/v0/add_subtask';
 const ep_delete_subtask = 'http://localhost:3000/v0/delete_subtask';
 const ep_update = 'http://localhost:3000/v0/update';
 
+const container = ref(null);
+
 const importTasksInput = ref(null);
 
 const allTasks = ref([]);
@@ -908,7 +910,10 @@ const exportTasks = () => {
 </script>
 
 <template>
-  <div id="container">
+  <div
+    id="container"
+    ref="container"
+  >
     <Space
       direction="vertical"
       style="width: 40%;"
@@ -931,6 +936,7 @@ const exportTasks = () => {
         placeholder="add filter tag..."
         notFoundContent=""
         :options="addFilterTagOptions"
+        :getPopupContainer="() => container"
         @focus="addFilterTagOnFocus"
         @search="addFilterTagOnSearch"
         @change="addFilterTagOnChange"
