@@ -71,6 +71,7 @@ const promptValue = ref('');
 const filterTags = ref([]);
 const addFilterTagOptions = ref([]);
 const addFilterTagHasFocus = ref(false);
+const addFilterTagEscapeCount = ref(0);
 
 const displayModal = ref(false);
 const modalId = ref(null);
@@ -340,26 +341,44 @@ onMounted(() => {
 
   // global escape listener
   // activate only when modal is not displayed and
-  // filter tag input is not focused
+  // filter tag input dropdown is not visible
   window.addEventListener('keydown', (e) => {
-    if (
-      e.key == 'Escape' &&
-      !displayModal.value &&
-      !addFilterTagHasFocus.value
-    ) {
+    if (e.key === 'Escape') {
+      if (addFilterTagHasFocus.value) {
 
-      // clear todo bar if not empty
-      if (promptValue.value !== '') {
-        promptValue.value = '';
-        updateDisplayedTasks();
+        // first escape closes the dropdown
+        // using dropdownVisibleChange listener doesnt help
+        // since variable visible changes to false
+        // before escape listener is invoked
+        // thus this hacky solution with an escape counter
+        // 
+        // known issue:
+        // still need 2 escape presses after deleting tags
+        // while dropdown is not visible
 
-      // clear filter tags if todo bar empty
-      } else if (filterTags.value.length !== 0) {
-        filterTags.value = [];
-        updateDisplayedTasks();
+        addFilterTagEscapeCount.value += 1;
+        if (addFilterTagEscapeCount.value >= 2) {
+          filterTags.value = [];
+          updateDisplayedTasks();
+        }
+
+      } else if (!displayModal.value) {
+
+        // clear todo bar if not empty
+        if (promptValue.value !== '') {
+          promptValue.value = '';
+          updateDisplayedTasks();
+
+        // clear filter tags if todo bar empty
+        } else if (filterTags.value.length !== 0) {
+          filterTags.value = [];
+          updateDisplayedTasks();
+        }
+
       }
     }
   });
+
 });
 
 const promptOnChange = updateDisplayedTasks;
@@ -421,15 +440,20 @@ const searchTags = (searchText, options, tags) => {
 
 // update focus state and generate options list
 const addFilterTagOnFocus = () => {
+  addFilterTagEscapeCount.value = 0;
   addFilterTagHasFocus.value = true;
   addFilterTagOnSearch('');
 };
 
 const addFilterTagOnSearch = searchText => {
+  // reset escape count on input
+  addFilterTagEscapeCount.value = 0;
   searchTags(searchText, addFilterTagOptions, filterTags);
 };
 
 const addFilterTagOnChange = () => {
+  // reset escape count on change
+  addFilterTagEscapeCount.value = 0;
   filterTags.value = processTags(filterTags.value);
   updateDisplayedTasks();
   addFilterTagOnSearch('');
