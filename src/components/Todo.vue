@@ -1,30 +1,16 @@
 <script setup>
 import {
-  onMounted,
-  ref,
-  watch,
-  nextTick,
-  Transition,
+  onMounted, ref, watch,
+  nextTick, Transition,
 } from 'vue';
 import {
-  AutoComplete,
-  Input,
-  Modal,
-  Select,
-  SelectOption,
-  Space,
-  Switch,
-  Tag,
-  Upload,
+  AutoComplete, Input, Modal,
+  Select, Space, Switch, Tag,
 } from 'ant-design-vue';
 import {
-  CheckOutlined,
-  CloseOutlined,
-  ExportOutlined,
-  FormOutlined,
-  ImportOutlined,
-  LockOutlined,
-  PlusOutlined,
+  CheckOutlined, CloseOutlined,
+  ExportOutlined, ImportOutlined, 
+  LockOutlined, PlusOutlined, 
   SettingOutlined,
 } from '@ant-design/icons-vue';
 import gsap from 'gsap';
@@ -57,6 +43,7 @@ const container = ref(null);
 
 const importTasksInput = ref(null);
 
+const blockTasksOnUpdate = ref(false);
 const allTasks = ref([]);
 const taskIndex = ref({});
 const displayedTasks = ref([]);
@@ -119,7 +106,7 @@ const persisted = ref({
 });
 
 const tasks = ref([]);
-watch(tasks, () => fetchTasks());
+watch(tasks, () => tasksOnUpdate());
 
 /*
 const post = async (endpoint, data) => {
@@ -311,6 +298,22 @@ const updateAllTags = () => {
   });
 };
 
+const tasksOnUpdate = () => {
+  if (blockTasksOnUpdate.value) return;
+  allTasks.value = tasks.value.filter(task => !task.deleted);
+  indexTasks();
+  unfinishedTasks.value = allTasks.value.filter(
+    (task) => !task.finished
+  );
+  updateDisplayedTasks();
+  updateAllTags();
+  if (modalId.value !== null) {
+    const task = getTask(modalId.value);
+    requirements.value = task.requirements;
+    dependents.value = task.dependents;
+  }
+};
+
 const fetchTasks = async () => {
   // allTasks.value = await (await fetch(ep_tasks)).json();
   allTasks.value = tasks.value.filter(task => !task.deleted);
@@ -361,6 +364,7 @@ onMounted(() => {
         // since variable visible changes to false
         // before escape listener is invoked
         // thus this hacky solution with an escape counter
+        // todo: ...can this be solved with the open prop?
         // 
         // known issue:
         // still need 2 escape presses after deleting tags
@@ -432,8 +436,11 @@ const processTags = (tags) => orderTags(
 
 const searchTags = (searchText, options, tags) => {
   const searchSequence = searchText.trim().split(' ');
-  options.value = allTagOptions.value.filter(
-    tagOption => (
+
+  // filter from ordered allTagOptions so they are
+  // already in order by occurence
+  const orderedTagOptions = allTagOptions.value.filter(
+    (tagOption) => (
       arbitraryMatch(
         searchSequence,
         getTagTargetSequence(tagOption.value)
@@ -445,6 +452,25 @@ const searchTags = (searchText, options, tags) => {
       )
     )
   );
+
+  // strip out the ones to prioritize
+  // i.e. those whose last component match with the last search term
+  const lastSearchTerm = searchSequence[searchSequence.length - 1];
+  const prioritizedTagOptions = orderedTagOptions.filter(
+    (tagOption) => {
+      const components = tagOption.value.split(hierarchicalTagDivider);
+      const lastComponent = components[components.length - 1];
+      return lastComponent.startsWith(lastSearchTerm);
+    }
+  );
+  const unprioritizedTagOptions = orderedTagOptions.filter(
+    (tagOption) => !prioritizedTagOptions.includes(tagOption)
+  );
+
+  options.value = [
+    ...prioritizedTagOptions,
+    ...unprioritizedTagOptions,
+  ];
 }
 
 const addFilterTagOnFocus = () => {
@@ -952,9 +978,12 @@ const importTasksOnChange = async (event) => {
   importedTasks.forEach(task => {
     task.id += idOffset;
   });
+  blockTasksOnUpdate.value = true;
   for (const task of importedTasks) {
-    addTask(task);
+    await addTask(task);
   }
+  blockTasksOnUpdate.value = false;
+  tasksOnUpdate();
 };
 
 const exportTasks = () => {
@@ -990,6 +1019,7 @@ const exportTasks = () => {
         style="width: 100%;"
         placeholder="add filter tag..."
         notFoundContent=""
+        :filterOption="false"
         :options="addFilterTagOptions"
         :getPopupContainer="() => container"
         @focus="addFilterTagOnFocus"
@@ -1081,6 +1111,7 @@ const exportTasks = () => {
             style="width: 100%;"
             placeholder="add tag..."
             notFoundContent=""
+            :filterOption="false"
             :options="addTagOptions"
             @focus="addTagOnFocus"
             @search="addTagOnSearch"
@@ -1667,7 +1698,7 @@ const exportTasks = () => {
 
 <style>
 
-/* why cant i change this in the component??? 😡😡 */
+/* why cant i change this within the component??? 😡😡 */
 .ant-select-selection-search-input {
   font-size: 16px;
 }
