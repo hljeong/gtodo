@@ -218,5 +218,5 @@ export const updateSettings = async (data) => {
 };
 
 export const deleteTask = async (id) => {
-  return updateTask(id, { deleted: true });
+  return updateTask(id, { pinned: false, deleted: true });
 };

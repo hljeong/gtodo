@@ -890,7 +890,8 @@ const fDeleteTask = id => {
   pinnedTaskIds.value = pinnedTaskIds.value.filter(task => task.id !== id);
   updateDisplayedTasks();
   */
-  getTask(id).deleted = true;
+  const task = getTask(id);
+  task.deleted = true;
   deleteTask(id);
   if (modalId.value === id) modalId.value = null;
   /*
