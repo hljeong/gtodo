@@ -70,6 +70,7 @@ const promptValue = ref('');
 
 const filterTags = ref([]);
 const addFilterTagOptions = ref([]);
+// focus state for escape logic
 const addFilterTagHasFocus = ref(false);
 const addFilterTagEscapeCount = ref(0);
 
@@ -84,6 +85,9 @@ const editDescriptionValue = ref('');
 const modalTags = ref([]);
 const addTagOptions = ref([]);
 const addTagValue = ref('');
+// focus state for escape logic
+const addTagHasFocus = ref(false);
+const addTagEscapeCount = ref(0);
 
 const requirements = ref([]);
 const addRequirementOptions = ref([]);
@@ -132,12 +136,7 @@ const post = async (endpoint, data) => {
 };
 */
 
-const hasTask = id => id in taskIndex.value;
-
-const getTask = id => {
-  if (!hasTask(id)) throw new Error(`task #${id} does not exist`);
-  return taskIndex.value[id];
-};
+const getTask = (id) => taskIndex.value[id];
 
 const indexTasks = () => {
   taskIndex.value = {};
@@ -343,8 +342,19 @@ onMounted(() => {
   // activate only when modal is not displayed and
   // filter tag input dropdown is not visible
   window.addEventListener('keydown', (e) => {
+
     if (e.key === 'Escape') {
-      if (addFilterTagHasFocus.value) {
+
+      if (displayModal.value) {
+
+        // same hack as filter tag (see below)
+
+        addTagEscapeCount.value += 1;
+        if (addTagHasFocus.value && addTagEscapeCount.value < 2) return;
+
+        displayModal.value = false;
+
+      } else if (addFilterTagHasFocus.value) {
 
         // first escape closes the dropdown
         // using dropdownVisibleChange listener doesnt help
@@ -362,18 +372,17 @@ onMounted(() => {
           updateDisplayedTasks();
         }
 
-      } else if (!displayModal.value) {
+      // clear todo bar if not empty
+      } else if (promptValue.value !== '') {
 
-        // clear todo bar if not empty
-        if (promptValue.value !== '') {
-          promptValue.value = '';
-          updateDisplayedTasks();
+        promptValue.value = '';
+        updateDisplayedTasks();
 
-        // clear filter tags if todo bar empty
-        } else if (filterTags.value.length !== 0) {
-          filterTags.value = [];
-          updateDisplayedTasks();
-        }
+      // clear filter tags if todo bar empty
+      } else if (filterTags.value.length !== 0) {
+
+        filterTags.value = [];
+        updateDisplayedTasks();
 
       }
     }
@@ -438,24 +447,29 @@ const searchTags = (searchText, options, tags) => {
   );
 }
 
-// update focus state and generate options list
 const addFilterTagOnFocus = () => {
   addFilterTagEscapeCount.value = 0;
+
   addFilterTagHasFocus.value = true;
+
+  // generate search options
   addFilterTagOnSearch('');
 };
 
 const addFilterTagOnSearch = searchText => {
   // reset escape count on input
   addFilterTagEscapeCount.value = 0;
+
   searchTags(searchText, addFilterTagOptions, filterTags);
 };
 
 const addFilterTagOnChange = () => {
-  // reset escape count on change
   addFilterTagEscapeCount.value = 0;
+
   filterTags.value = processTags(filterTags.value);
   updateDisplayedTasks();
+
+  // reset search options
   addFilterTagOnSearch('');
 };
 
@@ -464,7 +478,8 @@ const addFilterTagOnBlur = () => {
 };
 
 const showModal = (id) => {
-  if (!hasTask(id)) return;
+  addTagEscapeCount.value = 0;
+
   const task = getTask(id);
 
   editDescription.value = false;
@@ -521,18 +536,34 @@ const editDescriptionCancel = () => {
 };
 
 const addTagOnFocus = () => {
+  addTagEscapeCount.value = 0;
+
+  addTagHasFocus.value = true;
+
+  // generate search options
   addTagOnSearch('');
 };
 
 const addTagOnSearch = (searchText) => {
+  // reset escape count on input
+  addTagEscapeCount.value = 0;
+
   searchTags(searchText, addTagOptions, modalTags);
 };
 
 const addTagOnChange = () => {
+  addTagEscapeCount.value = 0;
+
   modalTags.value = processTags(modalTags.value);
   updateTask(modalId.value, { tags: modalTags.value });
+
+  // reset search options
   addTagOnSearch('');
 };
+
+const addTagOnBlur = () => {
+  addTagHasFocus.value = false;
+}
 
 const getTaskFromDescriptionWithId = description => {
   const descriptionSplit = description.split('#');
@@ -991,6 +1022,7 @@ const exportTasks = () => {
     <Modal
       v-if="modalId !== null && modalId.value !== null"
       v-model:open="displayModal"
+      :keyboard="false"
     >
       <!-- https://github.com/vuejs/vue/issues/6929#issuecomment-1952352146 -->
       <Input
@@ -1053,6 +1085,7 @@ const exportTasks = () => {
             @focus="addTagOnFocus"
             @search="addTagOnSearch"
             @change="addTagOnChange"
+            @blur="addTagOnBlur"
           >
             <template #tagRender="{ label: tag, onClose }">
               <Tag closable style="margin-right: 3px" @close="onClose">
