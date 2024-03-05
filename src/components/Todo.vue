@@ -27,18 +27,6 @@ import {
 const hierarchicalTagDivider = '/';
 const displayedHierarchicalTagDivider = ' > ';
 
-const ep_tasks = 'http://localhost:3000/v0/tasks'
-const ep_add = 'http://localhost:3000/v0/add'
-const ep_finish = 'http://localhost:3000/v0/finish';
-const ep_delete = 'http://localhost:3000/v0/delete';
-const ep_add_dependency = 'http://localhost:3000/v0/add_dependency';
-const ep_delete_dependency = 'http://localhost:3000/v0/delete_dependency';
-const ep_add_tag = 'http://localhost:3000/v0/add_tag';
-const ep_delete_tag = 'http://localhost:3000/v0/delete_tag';
-const ep_add_subtask = 'http://localhost:3000/v0/add_subtask';
-const ep_delete_subtask = 'http://localhost:3000/v0/delete_subtask';
-const ep_update = 'http://localhost:3000/v0/update';
-
 const container = ref(null);
 
 const importTasksInput = ref(null);
@@ -107,21 +95,6 @@ const persisted = ref({
 
 const tasks = ref([]);
 watch(tasks, () => tasksOnUpdate());
-
-/*
-const post = async (endpoint, data) => {
-  return fetch(
-    endpoint,
-    {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(data),
-    }
-  );
-};
-*/
 
 const matchTerm = (searchTerm, targetTerm) => targetTerm.toLowerCase().startsWith(searchTerm.toLowerCase());
 
@@ -284,16 +257,6 @@ const updateAllTags = () => {
   allTagsOrdered.value.sort((tag1, tag2) => allTagCounts.value[tag2] - allTagCounts.value[tag1]);
   allTagOptions.value = allTagsOrdered.value.map(tag => {
     const components = tag.split(hierarchicalTagDivider);
-    /*
-    let optionLabel = components.map(component => component[0]).join(displayedHierarchicalTagDivider);
-    optionLabel += components[components.length - 1].substring(1);
-    */
-    /*
-    return {
-      tag: tag,
-      value: optionLabel,
-    };
-    */
     const optionLabel = getDisplayedTag(tag);
     return {
       label: optionLabel,
@@ -319,7 +282,6 @@ const tasksOnUpdate = () => {
 };
 
 const fetchTasks = async () => {
-  // allTasks.value = await (await fetch(ep_tasks)).json();
   allTasks.value = tasks.value.filter(task => !task.deleted);
   indexTasks();
   for (const task of allTasks.value) {
@@ -355,7 +317,6 @@ onMounted(() => {
       if (displayModal.value) {
 
         // same hack as filter tag (see below)
-
         addTagEscapeCount.value += 1;
         if (addTagHasFocus.value && addTagEscapeCount.value < 2) return;
 
@@ -403,30 +364,12 @@ const promptOnChange = updateDisplayedTasks;
 const promptOnPressEnter = async () => {
   if (promptValue.value.trim() === '') return;
 
-  // post(ep_add, { description: promptValue.value.trim(), tags: filterTags.value })
-  /*
-  const id = fsTasks.value.length + 1;
-  setDoc(doc(fsTasksRef, id.toString()), {
-    id: id,
-    description: promptValue.value.trim(),
-    finished: false,
-    deleted: false,
-    timeCreated: new Date().toLocaleString(),
-    timeFinised: null,
-    tags: filterTags.value,
-    requirements: [],
-    dependents: [],
-    parent: null,
-    subtasks: [],
-  });// .then(fetchTasks);
-  */
   addTask({
     description: promptValue.value.trim(),
     timeCreated: Date.now(),
     tags: filterTags.value,
   });
   promptValue.value = '';
-  // updateDisplayedTasks();
 };
 
 // applied to all lists of tags
@@ -697,15 +640,6 @@ const addDependentClearValue = () => {
 const addRequirementOnSelect = (value, option) => {
   if ('value' in option) {
     const requirement = getTaskFromDescriptionWithId(option.value);
-    /*
-    post(
-      ep_add_dependency,
-      {
-        requirement: requirement.id,
-        dependent: modalId.value,
-      }
-    ).then(fetchTasks);
-    */
     // skip checks
     requirements.value.push(requirement.id);
     updateTask(modalId.value, { requirements: requirements.value });
@@ -718,15 +652,6 @@ const addRequirementOnSelect = (value, option) => {
 const addDependentOnSelect = (value, option) => {
   if ('value' in option) {
     const dependent = getTaskFromDescriptionWithId(option.value);
-    /*
-    post(
-      ep_add_dependency,
-      {
-        requirement: modalId.value,
-        dependent: dependent.id,
-      }
-    ).then(fetchTasks);
-    */
     // skip checks
     dependents.value.push(dependent.id);
     updateTask(modalId.value, { dependents: dependents.value });
@@ -737,15 +662,6 @@ const addDependentOnSelect = (value, option) => {
 };
 
 const deleteRequirementOnClick = id => {
-  /*
-  post(
-    ep_delete_dependency,
-    {
-      requirement: id,
-      dependent: modalId.value,
-    }
-  ).then(fetchTasks);
-  */
   // skip checks
   // todo: fix flicker (debounce rerendering?)
   requirements.value = requirements.value.filter(taskId => taskId !== id);
@@ -757,15 +673,6 @@ const deleteRequirementOnClick = id => {
 };
 
 const deleteDependentOnClick = id => {
-  /*
-  post(
-    ep_delete_dependency,
-    {
-      requirement: modalId.value,
-      dependent: id,
-    }
-  ).then(fetchTasks);
-  */
   // skip checks
   // todo: fix flicker
   dependents.value = dependents.value.filter(taskId => taskId !== id);
@@ -809,15 +716,6 @@ const setParentClearValue = () => {
 const setParentOnSelect = (value, option) => {
   if ('value' in option) {
     const parent = getTaskFromDescriptionWithId(option.value);
-    /*
-    post(
-      ep_add_subtask,
-      {
-        id: parent.id,
-        subtask_id: modalId.value,
-      }
-    ).then(fetchTasks);
-    */
     // skip checks
     getTask(modalId.value).parent = parent.id;
     updateTask(modalId.value, { parent: parent.id });
@@ -829,15 +727,6 @@ const setParentOnSelect = (value, option) => {
 };
 
 const deleteParentOnClick = () => {
-  /*
-  post(
-    ep_delete_subtask,
-    {
-      id: getTask(modalId.value).parent,
-      subtask_id: modalId.value,
-    }
-  ).then(fetchTasks);
-  */
   const parent = getTask(getTask(modalId.value).parent);
   // skip checks
   getTask(modalId.value).parent = null;
@@ -881,15 +770,6 @@ const addSubtaskOnSelect = (value, option) => {
   if ('value' in option) {
     // todo: use option.id?
     const subtask = getTaskFromDescriptionWithId(option.value);
-    /*
-    post(
-      ep_add_subtask,
-      {
-        id: modalId.value,
-        subtask_id: subtask.id,
-      }
-    ).then(fetchTasks);
-    */
     // skip checks
     subtasks.value.push(subtask.id);
     updateTask(modalId.value, { subtasks: subtasks.value });
@@ -900,15 +780,6 @@ const addSubtaskOnSelect = (value, option) => {
 };
 
 const deleteSubtaskOnClick = id => {
-  /*
-  post(
-    ep_delete_subtask,
-    {
-      id: modalId.value,
-      subtask_id: id,
-    }
-  ).then(fetchTasks);
-  */
   const subtask = getTask(id);
   subtasks.value = subtasks.value.filter(taskId => taskId !== id);
   updateTask(modalId.value, { subtasks: subtasks.value });
@@ -941,24 +812,13 @@ const finishTask = id => {
     finished: true,
     timeFinished: timeFinished,
   });
-  // await post(ep_finish, { id: id });
-  // await fetchTasks();
 };
 
 const fDeleteTask = id => {
-  /*
-  allTasks.value = allTasks.value.filter(task => task.id !== id);
-  pinnedTaskIds.value = pinnedTaskIds.value.filter(task => task.id !== id);
-  updateDisplayedTasks();
-  */
   const task = getTask(id);
   task.deleted = true;
   deleteTask(id);
   if (modalId.value === id) modalId.value = null;
-  /*
-  post(ep_delete, { id: id })
-    .then(fetchTasks);
-  */
 };
 
 const pinTask = taskId => {
