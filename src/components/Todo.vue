@@ -123,6 +123,10 @@ const post = async (endpoint, data) => {
 };
 */
 
+const matchTerm = (searchTerm, targetTerm) => targetTerm.toLowerCase().startsWith(searchTerm.toLowerCase());
+
+const matchTermExact = (searchTerm, targetTerm) => targetTerm.toLowerCase() === searchTerm.toLowerCase();
+
 const getTask = (id) => taskIndex.value[id];
 
 const indexTasks = () => {
@@ -150,7 +154,7 @@ const filterTasksBy = filter => {
   displayedTasks.value = displayedTasks.value.filter(filter);
 };
 
-const includesTag = (parent, subtag) => subtag === parent || subtag.startsWith(parent + hierarchicalTagDivider);
+const includesTag = (parent, subtag) => matchTermExact(subtag, parent) || matchTermExact(subtag, parent + hierarchicalTagDivider);
 
 const getTagTargetSequence = (tag) => [
   ...tag.split(hierarchicalTagDivider),
@@ -460,7 +464,7 @@ const searchTags = (searchText, options, tags) => {
     (tagOption) => {
       const components = tagOption.value.split(hierarchicalTagDivider);
       const lastComponent = components[components.length - 1];
-      return lastComponent.startsWith(lastSearchTerm);
+      return matchTerm(lastSearchTerm, lastComponent);
     }
   );
   const unprioritizedTagOptions = orderedTagOptions.filter(
@@ -622,7 +626,7 @@ const isDependent = (queryTaskId, taskId) => isRequirement(taskId, queryTaskId);
 const arbitraryMatch = function(searchSequence, targetSequence) {
   for (const searchWord of searchSequence) {
     if (!targetSequence.some(
-      targetWord => targetWord.startsWith(searchWord)
+      targetWord => matchTerm(searchWord, targetWord)
     )) {
       return false;
     }
