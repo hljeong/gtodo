@@ -21,7 +21,6 @@ import {
   addTask,
   updateTask,
   updateSettings,
-  deleteTask,
 } from '../backend/firebase.js';
 
 const hierarchicalTagDivider = '/';
@@ -49,9 +48,9 @@ const addFilterTagOptions = ref([]);
 const addFilterTagHasFocus = ref(false);
 const addFilterTagEscapeCount = ref(0);
 
-const displayModal = ref(false);
-const modalId = ref(null);
-const dummyModalInput = ref(null);
+const displayEdit = ref(false);
+const editId = ref(null);
+const dummyEditInput = ref(null);
 
 const editDescription = ref(false);
 const editDescriptionInput = ref(null);
@@ -112,11 +111,13 @@ const indexTasks = () => {
 const isParent = task => task.subtasks.length !== 0;
 
 const requirementsFinished = task => task.requirements.every(
-  requirement_id => getTask(requirement_id).finished
+  (requirementId) => getTask(requirementId).finished
 );
 
+const isBlocked = task => !requirementsFinished(task);
+
 const subtasksFinished = task => task.subtasks.every(
-  subtask_id => getTask(subtask_id).finished
+  (subtaskId) => getTask(subtaskId).finished
 );
 
 const resetTaskFilter = () => {
@@ -274,8 +275,8 @@ const tasksOnUpdate = () => {
   );
   updateDisplayedTasks();
   updateAllTags();
-  if (modalId.value !== null) {
-    const task = getTask(modalId.value);
+  if (editId.value !== null) {
+    const task = getTask(editId.value);
     requirements.value = task.requirements;
     dependents.value = task.dependents;
   }
@@ -292,8 +293,8 @@ const fetchTasks = async () => {
   );
   updateDisplayedTasks();
   updateAllTags();
-  if (modalId.value !== null) {
-    const task = getTask(modalId.value);
+  if (editId.value !== null) {
+    const task = getTask(editId.value);
     requirements.value = task.requirements;
     dependents.value = task.dependents;
   }
@@ -314,13 +315,13 @@ onMounted(() => {
 
     if (e.key === 'Escape') {
 
-      if (displayModal.value) {
+      if (displayEdit.value) {
 
         // same hack as filter tag (see below)
         addTagEscapeCount.value += 1;
         if (addTagHasFocus.value && addTagEscapeCount.value < 2) return;
 
-        displayModal.value = false;
+        displayEdit.value = false;
 
       } else if (addFilterTagHasFocus.value) {
 
@@ -450,7 +451,7 @@ const addFilterTagOnBlur = () => {
   addFilterTagHasFocus.value = false;
 };
 
-const showModal = (id) => {
+const showEdit = (id) => {
   addTagEscapeCount.value = 0;
 
   const task = getTask(id);
@@ -478,29 +479,29 @@ const showModal = (id) => {
   addSubtaskOptions.value = [];
   addSubtaskValue.value = '';
   
-  modalId.value = id;
-  displayModal.value = true;
+  editId.value = id;
+  displayEdit.value = true;
 };
 
 const modalDescriptionOnClick = async () => {
-  editDescriptionValue.value = getTask(modalId.value).description;
+  editDescriptionValue.value = getTask(editId.value).description;
   editDescription.value = true;
   await nextTick();
   editDescriptionInput.value.select();
 };
 
 const editDescriptionOnPressEnter = () => {
-  const task = getTask(modalId.value);
+  const task = getTask(editId.value);
   if (editDescriptionValue.value.trim() === '') {
     editDescription.value = false;
     editDescriptionValue.value = task.description;
   }
   task.description = editDescriptionValue.value.trim();
-  updateTask(modalId.value, { description: editDescriptionValue.value.trim() })
+  updateTask(editId.value, { description: editDescriptionValue.value.trim() })
     .then(fetchTasks);
   
   editDescription.value = false;
-  dummyModalInput.value.focus();
+  dummyEditInput.value.focus();
 };
 
 const editDescriptionCancel = () => {
@@ -528,7 +529,7 @@ const addTagOnChange = () => {
   addTagEscapeCount.value = 0;
 
   modalTags.value = processTags(modalTags.value);
-  updateTask(modalId.value, { tags: modalTags.value });
+  updateTask(editId.value, { tags: modalTags.value });
 
   // reset search options
   addTagOnSearch('');
@@ -595,9 +596,9 @@ const addRequirementOnSearch = searchText => {
         searchSequence,
         option.value.split(' ')
       ) && 
-      modalId.value !== option.id && 
-      !isRequirement(modalId.value, option.id) && 
-      !isDependent(modalId.value, option.id)
+      editId.value !== option.id && 
+      !isRequirement(editId.value, option.id) && 
+      !isDependent(editId.value, option.id)
     )
   );
 };
@@ -620,9 +621,9 @@ const addDependentOnSearch = searchText => {
         searchSequence,
         option.value.split(' ')
       ) && 
-      modalId.value !== option.id && 
-      !isRequirement(modalId.value, option.id) && 
-      !isDependent(modalId.value, option.id)
+      editId.value !== option.id && 
+      !isRequirement(editId.value, option.id) && 
+      !isDependent(editId.value, option.id)
     )
   );
 };
@@ -642,8 +643,8 @@ const addRequirementOnSelect = (value, option) => {
     const requirement = getTaskFromDescriptionWithId(option.value);
     // skip checks
     requirements.value.push(requirement.id);
-    updateTask(modalId.value, { requirements: requirements.value });
-    requirement.dependents.push(modalId.value);
+    updateTask(editId.value, { requirements: requirements.value });
+    requirement.dependents.push(editId.value);
     updateTask(requirement.id, { dependents: requirement.dependents });
   }
   addRequirementClearValue();
@@ -654,8 +655,8 @@ const addDependentOnSelect = (value, option) => {
     const dependent = getTaskFromDescriptionWithId(option.value);
     // skip checks
     dependents.value.push(dependent.id);
-    updateTask(modalId.value, { dependents: dependents.value });
-    dependent.requirements.push(modalId.value);
+    updateTask(editId.value, { dependents: dependents.value });
+    dependent.requirements.push(editId.value);
     updateTask(dependent.id, { requirements: dependent.requirements });
   }
   addDependentClearValue();
@@ -665,22 +666,22 @@ const deleteRequirementOnClick = id => {
   // skip checks
   // todo: fix flicker (debounce rerendering?)
   requirements.value = requirements.value.filter(taskId => taskId !== id);
-  updateTask(modalId.value, { requirements: requirements.value });
-  getTask(id).dependents = getTask(id).dependents.filter(taskId => taskId !== modalId.value);
+  updateTask(editId.value, { requirements: requirements.value });
+  getTask(id).dependents = getTask(id).dependents.filter(taskId => taskId !== editId.value);
   updateTask(id, { dependents: getTask(id).dependents });
 
-  dummyModalInput.value.focus();
+  dummyEditInput.value.focus();
 };
 
 const deleteDependentOnClick = id => {
   // skip checks
   // todo: fix flicker
   dependents.value = dependents.value.filter(taskId => taskId !== id);
-  updateTask(modalId.value, { dependents: dependents.value });
-  getTask(id).requirements = getTask(id).requirements.filter(taskId => taskId !== modalId.value);
+  updateTask(editId.value, { dependents: dependents.value });
+  getTask(id).requirements = getTask(id).requirements.filter(taskId => taskId !== editId.value);
   updateTask(id, { requirements: getTask(id).requirements });
 
-  dummyModalInput.value.focus();
+  dummyEditInput.value.focus();
 };
 
 const setParentOnSearch = searchText => {
@@ -701,9 +702,9 @@ const setParentOnSearch = searchText => {
         searchSequence,
         option.value.split(' ')
       ) && 
-      modalId.value !== option.id && 
-      !isDescendant(option.id, modalId.value) &&
-      !isRequirement(option.id, modalId.value)
+      editId.value !== option.id && 
+      !isDescendant(option.id, editId.value) &&
+      !isRequirement(option.id, editId.value)
     )
   );
 };
@@ -717,23 +718,23 @@ const setParentOnSelect = (value, option) => {
   if ('value' in option) {
     const parent = getTaskFromDescriptionWithId(option.value);
     // skip checks
-    getTask(modalId.value).parent = parent.id;
-    updateTask(modalId.value, { parent: parent.id });
-    parent.subtasks.push(modalId.value);
+    getTask(editId.value).parent = parent.id;
+    updateTask(editId.value, { parent: parent.id });
+    parent.subtasks.push(editId.value);
     updateTask(parent.id, { subtasks: parent.subtasks });
   }
   setParentClearValue();
-  dummyModalInput.value.focus();
+  dummyEditInput.value.focus();
 };
 
 const deleteParentOnClick = () => {
-  const parent = getTask(getTask(modalId.value).parent);
+  const parent = getTask(getTask(editId.value).parent);
   // skip checks
-  getTask(modalId.value).parent = null;
-  updateTask(modalId.value, { parent: null });
-  parent.subtasks = parent.subtasks.filter(subtaskId => subtaskId !== modalId.value);
+  getTask(editId.value).parent = null;
+  updateTask(editId.value, { parent: null });
+  parent.subtasks = parent.subtasks.filter(subtaskId => subtaskId !== editId.value);
   updateTask(parent.id, { subtasks: parent.subtasks });
-  dummyModalInput.value.focus();
+  dummyEditInput.value.focus();
 };
 
 const addSubtaskOnSearch = searchText => {
@@ -754,8 +755,8 @@ const addSubtaskOnSearch = searchText => {
         searchSequence,
         option.value.split(' ')
       ) && 
-      modalId.value !== option.id && 
-      !isAncestor(option.id, modalId.value) && 
+      editId.value !== option.id && 
+      !isAncestor(option.id, editId.value) && 
       getTask(option.id).parent === null
     )
   );
@@ -772,9 +773,9 @@ const addSubtaskOnSelect = (value, option) => {
     const subtask = getTaskFromDescriptionWithId(option.value);
     // skip checks
     subtasks.value.push(subtask.id);
-    updateTask(modalId.value, { subtasks: subtasks.value });
-    subtask.parent = modalId.value;
-    updateTask(subtask.id, { parent: modalId.value });
+    updateTask(editId.value, { subtasks: subtasks.value });
+    subtask.parent = editId.value;
+    updateTask(subtask.id, { parent: editId.value });
   }
   addSubtaskClearValue();
 };
@@ -782,10 +783,10 @@ const addSubtaskOnSelect = (value, option) => {
 const deleteSubtaskOnClick = id => {
   const subtask = getTask(id);
   subtasks.value = subtasks.value.filter(taskId => taskId !== id);
-  updateTask(modalId.value, { subtasks: subtasks.value });
+  updateTask(editId.value, { subtasks: subtasks.value });
   subtask.parent = null;
   updateTask(subtask.id, { parent: null });
-  dummyModalInput.value.focus();
+  dummyEditInput.value.focus();
 };
 
 const finishTaskIfCompleted = async task => {
@@ -814,11 +815,12 @@ const finishTask = id => {
   });
 };
 
-const fDeleteTask = id => {
+const deleteTask = id => {
   const task = getTask(id);
+  task.pinned = false;
   task.deleted = true;
-  deleteTask(id);
-  if (modalId.value === id) modalId.value = null;
+  updateTask(id, { pinned: false, deleted: true });
+  if (editId.value === id) editId.value = null;
 };
 
 const pinTask = taskId => {
@@ -903,24 +905,24 @@ const exportTasks = () => {
     <TaskList
       :tasks="displayedTasks"
       :showTags="persisted.settings.showTags"
-      :editTask="task => showModal(task.id)"
-      :deleteTask="task => fDeleteTask(task.id)"
+      :editTask="showEdit"
+      :deleteTask="deleteTask"
       :finishTask="finishTask"
       :pinTask="pinTask"
       :unpinTask="unpinTask"
-      :isBlocked="task => !requirementsFinished(task)"
+      :isBlocked="isBlocked"
       :isParent="isParent"
       :getDisplayedTag="getDisplayedTag"
     />
 
     <Modal
-      v-if="modalId !== null && modalId.value !== null"
-      v-model:open="displayModal"
+      v-if="editId !== null && editId.value !== null"
+      v-model:open="displayEdit"
       :keyboard="false"
     >
       <!-- https://github.com/vuejs/vue/issues/6929#issuecomment-1952352146 -->
       <Input
-        ref="dummyModalInput"
+        ref="dummyEditInput"
         style="position: absolute; opacity: 0%; height: 0%; width: 0%;"
       />
       <Space direction="vertical" size="middle" style="width: 100%;">
@@ -946,7 +948,7 @@ const exportTasks = () => {
             style="font-weight: bold; font-size: 20px;"
             @click="modalDescriptionOnClick"
           >
-            {{ getTask(modalId).description }}
+            {{ getTask(editId).description }}
           </span>
           <span
             :class="editDescription ? 'hide' : 'smooth-show'"
@@ -956,7 +958,7 @@ const exportTasks = () => {
               color: #666;
             "
           >
-              {{ ` #${getTask(modalId).id}` }}
+              {{ ` #${getTask(editId).id}` }}
           </span>
         </Space>
 
@@ -988,52 +990,6 @@ const exportTasks = () => {
               </Tag>
             </template>
           </Select>
-
-          <!--
-          <Space
-            class="rounded-corners"
-            :size="[0, 8]"
-            wrap
-          >
-            <Tag v-for="tag of getTask(modalId).tags">
-              <template #icon>
-                <close-outlined
-                  class="hover-highlight close"
-                  style="font-size: 10px;"
-                  @click="() => {
-                    deleteTag(modalId, tag);
-                    dummyModalInput.focus();
-                  }"
-                />
-              </template>
-
-              <span style="margin-left: -4px;">{{ getDisplayedTag(tag) }}</span>
-            </Tag>
-            <Tag>
-              <template #icon>
-                <plus-outlined style="font-size: 12px;" />
-              </template>
-
-              <AutoComplete
-                v-model:value="addTagValue"
-                style="margin-left: -10px;"
-                :options="addTagOptions"
-                :defaultActiveFirstOption="false"
-                @search="addTagOnSearch"
-                @select="addTagOnSelect"
-              >
-                <Input
-                  :bordered="false"
-                  placeholder="add tag..."
-                  size="small"
-                  style="font-size: 14px; width: 160px"
-                  @pressEnter="addTagOnPressEnter"
-                  @blur="addTagClearValue"
-                />
-              </AutoComplete>
-            </Tag>
-          </Space>
-          -->
         </Space>
 
         <Space
@@ -1046,7 +1002,7 @@ const exportTasks = () => {
           </h4>
 
           <template
-            v-if="modalId !== null"
+            v-if="editId !== null"
             v-for="taskId of requirements"
           >
             <div
@@ -1107,7 +1063,7 @@ const exportTasks = () => {
           </h4>
 
           <template
-            v-if="modalId !== null"
+            v-if="editId !== null"
             v-for="taskId of dependents"
           >
             <div
@@ -1170,7 +1126,7 @@ const exportTasks = () => {
           </h4>
 
           <div
-            v-if="modalId !== null && getTask(modalId).parent !== null"
+            v-if="editId !== null && getTask(editId).parent !== null"
             class="
               child-show-on-hover
               rounded-corners
@@ -1184,8 +1140,8 @@ const exportTasks = () => {
             "
           >
             <p>
-              <span>{{ getTask(getTask(modalId).parent).description }}</span>
-              <span style="color: #666;"> #{{ getTask(getTask(modalId).parent).id }}</span>
+              <span>{{ getTask(getTask(editId).parent).description }}</span>
+              <span style="color: #666;"> #{{ getTask(getTask(editId).parent).id }}</span>
             </p>
 
             <div style="flex: 1;">
@@ -1229,7 +1185,7 @@ const exportTasks = () => {
           </h4>
 
           <template
-            v-if="modalId !== null"
+            v-if="editId !== null"
             v-for="taskId of subtasks"
           >
             <div

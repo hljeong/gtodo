@@ -148,14 +148,14 @@ const onLeave = (el, done) => {
 
         <form-outlined
           class="show-on-hover clickable-icon"
-          @click="props.editTask(task)"
+          @click="props.editTask(task.id)"
         />
 
         <close-outlined
           class="show-on-hover clickable-icon"
           @click="
             task.deleted ?
-              null : props.deleteTask(task)
+              null : props.deleteTask(task.id)
           "
         />
       </Space>

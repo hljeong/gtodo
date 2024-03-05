@@ -216,7 +216,3 @@ export const updateSettings = async (data) => {
   const updatedSettings = { ...settings, ...data };
   return await setDoc(settingsRef, updatedSettings);
 };
-
-export const deleteTask = async (id) => {
-  return updateTask(id, { pinned: false, deleted: true });
-};
