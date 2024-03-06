@@ -17,71 +17,38 @@ import gsap from 'gsap';
 import { saveAs } from 'file-saver';
 import TaskList from './TaskList.vue';
 import {
-  register,
-  addTask,
-  updateTask,
-  updateSettings,
+  register, addTask,
+  updateTask, updateSettings,
 } from '../backend/firebase.js';
 
-const hierarchicalTagDivider = '/';
-const displayedHierarchicalTagDivider = ' > ';
 
+
+// miscellaneous ui
 const container = ref(null);
-
 const importTasksInput = ref(null);
 
+
+
+// tasks
 const blockTasksOnUpdate = ref(false);
-const allTasks = ref([]);
+const tasks = ref([]);
 const taskIndex = ref({});
 const displayedTasks = ref([]);
 const unfinishedTasks = ref([]);
 
+
+
+// tags
 const allTagCounts = ref({});
 const allTagsOrdered = ref([]);
 const allTagOptions = ref([]);
 
-const promptValue = ref('');
+const hierarchicalTagDivider = '/';
+const displayedHierarchicalTagDivider = ' > ';
 
-const filterTags = ref([]);
-const addFilterTagOptions = ref([]);
-// focus state for escape logic
-const addFilterTagHasFocus = ref(false);
-const addFilterTagEscapeCount = ref(0);
 
-const displayEdit = ref(false);
-const editId = ref(null);
-const dummyEditInput = ref(null);
 
-const editDescription = ref(false);
-const editDescriptionInput = ref(null);
-const editDescriptionValue = ref('');
-
-const modalTags = ref([]);
-const addTagOptions = ref([]);
-const addTagValue = ref('');
-// focus state for escape logic
-const addTagHasFocus = ref(false);
-const addTagEscapeCount = ref(0);
-
-const requirements = ref([]);
-const addRequirementOptions = ref([]);
-const addRequirementValue = ref('');
-const addRequirementInput = ref(null);
-
-const dependents = ref([]);
-const addDependentOptions = ref([]);
-const addDependentValue = ref('');
-const addDependentInput = ref(null);
-
-const setParentOptions = ref([]);
-const setParentValue = ref('');
-const setParentInput = ref(null);
-
-const subtasks = ref([]);
-const addSubtaskOptions = ref([]);
-const addSubtaskValue = ref('');
-const addSubtaskInput = ref(null);
-
+// persisted
 const persisted = ref({
   settings: {
     showTags: true,
@@ -92,14 +59,76 @@ const persisted = ref({
   },
 });
 
-const tasks = ref([]);
-watch(tasks, () => tasksOnUpdate());
 
-const matchTerm = (searchTerm, targetTerm) => targetTerm.toLowerCase().startsWith(searchTerm.toLowerCase());
 
-const matchTermExact = (searchTerm, targetTerm) => targetTerm.toLowerCase() === searchTerm.toLowerCase();
+// todo bar + filter tags
+const promptValue = ref('');
 
+const filterTags = ref([]);
+const addFilterTagOptions = ref([]);
+// focus state for escape logic
+const addFilterTagHasFocus = ref(false);
+const addFilterTagEscapeCount = ref(0);
+
+
+
+// edit panel
+const displayEditPanel = ref(false);
+const editId = ref(null);
+const dummyEditInput = ref(null);
+
+// description
+const editDescription = ref(false);
+const editDescriptionInput = ref(null);
+const editDescriptionValue = ref('');
+
+// tags
+const editTags = ref([]);
+const addTagOptions = ref([]);
+const addTagValue = ref('');
+// focus state for escape logic
+const addTagHasFocus = ref(false);
+const addTagEscapeCount = ref(0);
+
+// requirements
+const requirements = ref([]);
+const addRequirementOptions = ref([]);
+const addRequirementValue = ref('');
+const addRequirementInput = ref(null);
+
+// dependents
+const dependents = ref([]);
+const addDependentOptions = ref([]);
+const addDependentValue = ref('');
+const addDependentInput = ref(null);
+
+// parent
+const setParentOptions = ref([]);
+const setParentValue = ref('');
+const setParentInput = ref(null);
+
+// subtasks
+const subtasks = ref([]);
+const addSubtaskOptions = ref([]);
+const addSubtaskValue = ref('');
+const addSubtaskInput = ref(null);
+
+
+
+// tasks
 const getTask = (id) => taskIndex.value[id];
+
+const isParent = task => task.subtasks.length !== 0;
+
+const isBlocked = (task) => task.requirements.some(
+  (requirementId) => !getTask(requirementId).finished
+);
+
+const isntBlocked = (task) => !isBlocked(task);
+
+const isCompleted = task => task.subtasks.every(
+  (subtaskId) => getTask(subtaskId).finished
+);
 
 const indexTasks = () => {
   taskIndex.value = {};
@@ -108,27 +137,147 @@ const indexTasks = () => {
   }
 };
 
-const isParent = task => task.subtasks.length !== 0;
+const isDescendant = (queryTaskId, taskId) => isAncestor(taskId, queryTaskId);
 
-const requirementsFinished = task => task.requirements.every(
-  (requirementId) => getTask(requirementId).finished
+const isRequirement = (queryTaskId, taskId) => {
+  for (const requirementId of getTask(taskId).requirements) {
+    if (queryTaskId === requirementId) return true;
+  }
+  return false;
+};
+
+const isDependent = (queryTaskId, taskId) => isRequirement(taskId, queryTaskId);
+
+const isAncestor = (queryTaskId, taskId) => {
+  let ancestorId = getTask(taskId).parent;
+  while (ancestorId !== null) {
+    if (ancestorId === queryTaskId) return true;
+    ancestorId = getTask(ancestorId).parent;
+  }
+  return false;
+};
+
+const importTasks = async (file) => {
+  const content = await file.text();
+  const importedTasks = JSON.parse(content);
+  // todo: validity checks?
+  const idOffset = tasks.value.length;
+  importedTasks.forEach(task => {
+    task.id += idOffset;
+  });
+  blockTasksOnUpdate.value = true;
+  for (const task of importedTasks) {
+    await addTask(task);
+  }
+  blockTasksOnUpdate.value = false;
+  tasksOnUpdate();
+}
+
+const exportTasks = () => {
+  const data = JSON.stringify(tasks.value, null, 2);
+  const blob = new Blob([data], { type: 'application/json' });
+  saveAs(blob, 'gtodo-tasks.json');
+};
+
+const finishTaskIfCompleted = async task => {
+  // autocomplete only works on parent tasks
+  if (task.finished || !isParent(task)) return false;
+  
+  if (isntBlocked(task) && isCompleted(task)) {
+    await finishTask(task.id);
+    return true;
+  }
+  return false;
+};
+
+const finishTask = (id) => {
+  const timeFinished = Date.now();
+  const task = getTask(id);
+  task.pinned = false;
+  task.finished = true;
+  task.timeFinished = timeFinished;
+  updateDisplayedTasks();
+
+  updateTask(id, {
+    pinned: false,
+    finished: true,
+    timeFinished: timeFinished,
+  });
+};
+
+const deleteTask = (id) => {
+  const task = getTask(id);
+  task.pinned = false;
+  task.deleted = true;
+  updateTask(id, { pinned: false, deleted: true });
+  if (editId.value === id) editId.value = null;
+};
+
+const pinTask = (id) => {
+  const task = getTask(id);
+  task.pinned = true;
+  updateTask(id, { pinned: true });
+  updateDisplayedTasks();
+};
+
+const unpinTask = (id) => {
+  const task = getTask(id);
+  task.pinned = false;
+  updateTask(id, { pinned: false });
+  updateDisplayedTasks();
+};
+
+
+
+// tags
+const includesTag = (parent, subtag) => matchTermExact(subtag, parent) || matchTermExact(subtag, parent + hierarchicalTagDivider);
+
+const removeInvalidTags = (tags) => tags.filter(
+  (tag) => (
+    !tag.includes(' ') &&
+    !tag.includes(hierarchicalTagDivider + hierarchicalTagDivider)
+  )
 );
 
-const isBlocked = task => !requirementsFinished(task);
+const deduplicateTags = (tags) => {
+  let deduplicatedTags = [];
+  for (const tag of tags) {
+    if (deduplicatedTags.some(
+      existingTag => includesTag(tag, existingTag)
+    )) continue;
+    deduplicatedTags = deduplicatedTags.filter(
+      existingTag => !includesTag(existingTag, tag)
+    )
+    deduplicatedTags.push(tag);
+  }
+  return deduplicatedTags;
+};
 
-const subtasksFinished = task => task.subtasks.every(
-  (subtaskId) => getTask(subtaskId).finished
+const getDisplayedTag = (tag) => tag.replaceAll(hierarchicalTagDivider, displayedHierarchicalTagDivider);
+
+// applied to all lists of tags
+const processTags = (tags) => orderTags(
+  deduplicateTags(
+    removeInvalidTags(
+      tags
+    )
+  )
 );
+
+
+
+// search
+const matchTerm = (searchTerm, targetTerm) => targetTerm.toLowerCase().startsWith(searchTerm.toLowerCase());
+
+const matchTermExact = (searchTerm, targetTerm) => targetTerm.toLowerCase() === searchTerm.toLowerCase();
 
 const resetTaskFilter = () => {
-  displayedTasks.value = allTasks.value.slice();
+  displayedTasks.value = tasks.value.filter((task) => !task.deleted).slice();
 };
 
 const filterTasksBy = filter => {
   displayedTasks.value = displayedTasks.value.filter(filter);
 };
-
-const includesTag = (parent, subtag) => matchTermExact(subtag, parent) || matchTermExact(subtag, parent + hierarchicalTagDivider);
 
 const getTagTargetSequence = (tag) => [
   ...tag.split(hierarchicalTagDivider),
@@ -189,198 +338,21 @@ const filterTasks = () => {
 
   // filter out blocked tasks if not showing them
   if (!persisted.value.settings.showBlocked) {
-    const filterOutBlocked = requirementsFinished;
+    const filterOutBlocked = isntBlocked;
     filterTasksBy(filterOutBlocked);
   }
 };
 
-const removeInvalidTags = (tags) => tags.filter(
-  (tag) => (
-    !tag.includes(' ') &&
-    !tag.includes(hierarchicalTagDivider + hierarchicalTagDivider)
-  )
-);
-
-const deduplicateTags = (tags) => {
-  let deduplicatedTags = [];
-  for (const tag of tags) {
-    if (deduplicatedTags.some(
-      existingTag => includesTag(tag, existingTag)
-    )) continue;
-    deduplicatedTags = deduplicatedTags.filter(
-      existingTag => !includesTag(existingTag, tag)
-    )
-    deduplicatedTags.push(tag);
-  }
-  return deduplicatedTags;
-};
-
-const orderTags = (tags) => [
-  ...allTagsOrdered.value.filter(
-    tag => tags.includes(tag)
-  ),
-  ...tags.filter(
-    tag => !allTagsOrdered.value.includes(tag)
-  ),
-];
-
-const orderTasks = () => {
-  // reversed for now, todo: reorder according to policy
-  displayedTasks.value.sort((task1, task2) => task2.timeCreated - task1.timeCreated);
-
-  const displayedPinnedTasks = displayedTasks.value.filter(
-    task => task.pinned
-  );
-  const displayedUnpinnedTasks = displayedTasks.value.filter(
-    task => !task.pinned
-  );
-  displayedTasks.value = displayedPinnedTasks;
-  displayedTasks.value.push(...displayedUnpinnedTasks);
-};
-
-const updateDisplayedTasks = () => {
-  filterTasks();
-  orderTasks();
-};
-
-const getDisplayedTag = (tag) => tag.replaceAll(hierarchicalTagDivider, displayedHierarchicalTagDivider);
-
-const updateAllTags = () => {
-  allTagCounts.value = {};
-  const allTagsFlattened = [].concat(...allTasks.value.map(
-    task => task.tags
-  ));
-  for (const tag of allTagsFlattened) {
-    if (tag in allTagCounts.value) allTagCounts.value[tag] += 1;
-    else allTagCounts.value[tag] = 1;
-  }
-  allTagsOrdered.value = Object.keys(allTagCounts.value);
-  allTagsOrdered.value.sort((tag1, tag2) => allTagCounts.value[tag2] - allTagCounts.value[tag1]);
-  allTagOptions.value = allTagsOrdered.value.map(tag => {
-    const components = tag.split(hierarchicalTagDivider);
-    const optionLabel = getDisplayedTag(tag);
-    return {
-      label: optionLabel,
-      value: tag,
+const arbitraryMatch = function(searchSequence, targetSequence) {
+  for (const searchWord of searchSequence) {
+    if (!targetSequence.some(
+      targetWord => matchTerm(searchWord, targetWord)
+    )) {
+      return false;
     }
-  });
-};
-
-const tasksOnUpdate = () => {
-  if (blockTasksOnUpdate.value) return;
-  allTasks.value = tasks.value.filter(task => !task.deleted);
-  indexTasks();
-  unfinishedTasks.value = allTasks.value.filter(
-    (task) => !task.finished
-  );
-  updateDisplayedTasks();
-  updateAllTags();
-  if (editId.value !== null) {
-    const task = getTask(editId.value);
-    requirements.value = task.requirements;
-    dependents.value = task.dependents;
   }
+  return true;
 };
-
-const fetchTasks = async () => {
-  allTasks.value = tasks.value.filter(task => !task.deleted);
-  indexTasks();
-  for (const task of allTasks.value) {
-    if (await finishTaskIfCompleted(task)) return;
-  }
-  unfinishedTasks.value = allTasks.value.filter(
-    task => !task.finished
-  );
-  updateDisplayedTasks();
-  updateAllTags();
-  if (editId.value !== null) {
-    const task = getTask(editId.value);
-    requirements.value = task.requirements;
-    dependents.value = task.dependents;
-  }
-};
-
-onMounted(() => {
-
-  // register listeners
-  register({
-    tasks: { target: tasks, after: updateDisplayedTasks },
-    persisted: { target: persisted, after: updateDisplayedTasks },
-  });
-
-  // global escape listener
-  // activate only when modal is not displayed and
-  // filter tag input dropdown is not visible
-  window.addEventListener('keydown', (e) => {
-
-    if (e.key === 'Escape') {
-
-      if (displayEdit.value) {
-
-        // same hack as filter tag (see below)
-        addTagEscapeCount.value += 1;
-        if (addTagHasFocus.value && addTagEscapeCount.value < 2) return;
-
-        displayEdit.value = false;
-
-      } else if (addFilterTagHasFocus.value) {
-
-        // first escape closes the dropdown
-        // using dropdownVisibleChange listener doesnt help
-        // since variable visible changes to false
-        // before escape listener is invoked
-        // thus this hacky solution with an escape counter
-        // todo: ...can this be solved with the open prop?
-        // 
-        // known issue:
-        // still need 2 escape presses after deleting tags
-        // while dropdown is not visible
-
-        addFilterTagEscapeCount.value += 1;
-        if (addFilterTagEscapeCount.value >= 2) {
-          filterTags.value = [];
-          updateDisplayedTasks();
-        }
-
-      // clear todo bar if not empty
-      } else if (promptValue.value !== '') {
-
-        promptValue.value = '';
-        updateDisplayedTasks();
-
-      // clear filter tags if todo bar empty
-      } else if (filterTags.value.length !== 0) {
-
-        filterTags.value = [];
-        updateDisplayedTasks();
-
-      }
-    }
-  });
-
-});
-
-const promptOnChange = updateDisplayedTasks;
-
-const promptOnPressEnter = async () => {
-  if (promptValue.value.trim() === '') return;
-
-  addTask({
-    description: promptValue.value.trim(),
-    timeCreated: Date.now(),
-    tags: filterTags.value,
-  });
-  promptValue.value = '';
-};
-
-// applied to all lists of tags
-const processTags = (tags) => orderTags(
-  deduplicateTags(
-    removeInvalidTags(
-      tags
-    )
-  )
-);
 
 const searchTags = (searchText, options, tags) => {
   const searchSequence = searchText.trim().split(' ');
@@ -419,7 +391,96 @@ const searchTags = (searchText, options, tags) => {
     ...prioritizedTagOptions,
     ...unprioritizedTagOptions,
   ];
-}
+};
+
+
+
+// priority
+const orderTags = (tags) => [
+  // prioritize existing tags
+  ...allTagsOrdered.value.filter(
+    (tag) => tags.includes(tag)
+  ),
+  ...tags.filter(
+    (tag) => !allTagsOrdered.value.includes(tag)
+  ),
+];
+
+const orderTasks = () => {
+  // reversed chronological for now
+  // todo: reorder according to policy
+  displayedTasks.value.sort((task1, task2) => task2.timeCreated - task1.timeCreated);
+
+  const displayedPinnedTasks = displayedTasks.value.filter(
+    task => task.pinned
+  );
+  const displayedUnpinnedTasks = displayedTasks.value.filter(
+    task => !task.pinned
+  );
+  displayedTasks.value = displayedPinnedTasks;
+  displayedTasks.value.push(...displayedUnpinnedTasks);
+};
+
+
+
+// updates
+const tasksOnUpdate = () => {
+  if (blockTasksOnUpdate.value) return;
+  indexTasks();
+  unfinishedTasks.value = tasks.value.filter(
+    (task) => !task.deleted && !task.finished
+  );
+  updateDisplayedTasks();
+  updateAllTags();
+  if (editId.value !== null) {
+    const task = getTask(editId.value);
+    requirements.value = task.requirements;
+    dependents.value = task.dependents;
+  }
+};
+
+const updateDisplayedTasks = () => {
+  filterTasks();
+  orderTasks();
+};
+
+const updateAllTags = () => {
+  allTagCounts.value = {};
+  const allTagsFlattened = [].concat(...tasks.value.filter((task) => !task.deleted).map(
+    task => task.tags
+  ));
+  for (const tag of allTagsFlattened) {
+    if (tag in allTagCounts.value) allTagCounts.value[tag] += 1;
+    else allTagCounts.value[tag] = 1;
+  }
+  allTagsOrdered.value = Object.keys(allTagCounts.value);
+  allTagsOrdered.value.sort((tag1, tag2) => allTagCounts.value[tag2] - allTagCounts.value[tag1]);
+  allTagOptions.value = allTagsOrdered.value.map(tag => {
+    const components = tag.split(hierarchicalTagDivider);
+    const optionLabel = getDisplayedTag(tag);
+    return {
+      label: optionLabel,
+      value: tag,
+    }
+  });
+};
+
+
+
+// listeners
+// todo bar + filter tags
+const promptOnChange = updateDisplayedTasks;
+
+const promptOnPressEnter = async () => {
+  if (promptValue.value.trim() === '') return;
+
+  addTask({
+    description: promptValue.value.trim(),
+    timeCreated: Date.now(),
+    tags: filterTags.value,
+  });
+  promptValue.value = '';
+};
 
 const addFilterTagOnFocus = () => {
   addFilterTagEscapeCount.value = 0;
@@ -451,6 +512,7 @@ const addFilterTagOnBlur = () => {
   addFilterTagHasFocus.value = false;
 };
 
+// edit panel
 const showEdit = (id) => {
   addTagEscapeCount.value = 0;
 
@@ -459,7 +521,7 @@ const showEdit = (id) => {
   editDescription.value = false;
   editDescriptionValue.value = task.description;
 
-  modalTags.value = task.tags;
+  editTags.value = task.tags;
   addTagOptions.value = allTagOptions.value.filter(
     tag => !task.tags.includes(tag.value)
   );
@@ -480,10 +542,11 @@ const showEdit = (id) => {
   addSubtaskValue.value = '';
   
   editId.value = id;
-  displayEdit.value = true;
+  displayEditPanel.value = true;
 };
 
-const modalDescriptionOnClick = async () => {
+// edit panel description
+const editDescriptionOnClick = async () => {
   editDescriptionValue.value = getTask(editId.value).description;
   editDescription.value = true;
   await nextTick();
@@ -498,7 +561,6 @@ const editDescriptionOnPressEnter = () => {
   }
   task.description = editDescriptionValue.value.trim();
   updateTask(editId.value, { description: editDescriptionValue.value.trim() })
-    .then(fetchTasks);
   
   editDescription.value = false;
   dummyEditInput.value.focus();
@@ -509,6 +571,7 @@ const editDescriptionCancel = () => {
   editDescriptionValue.value = '';
 };
 
+// edit panel tags
 const addTagOnFocus = () => {
   addTagEscapeCount.value = 0;
 
@@ -522,14 +585,14 @@ const addTagOnSearch = (searchText) => {
   // reset escape count on input
   addTagEscapeCount.value = 0;
 
-  searchTags(searchText, addTagOptions, modalTags);
+  searchTags(searchText, addTagOptions, editTags);
 };
 
 const addTagOnChange = () => {
   addTagEscapeCount.value = 0;
 
-  modalTags.value = processTags(modalTags.value);
-  updateTask(editId.value, { tags: modalTags.value });
+  editTags.value = processTags(editTags.value);
+  updateTask(editId.value, { tags: editTags.value });
 
   // reset search options
   addTagOnSearch('');
@@ -547,37 +610,7 @@ const getTaskFromDescriptionWithId = description => {
 
 const getDescriptionWithId = task => `${task.description} #${task.id}`;
 
-const isAncestor = (queryTaskId, taskId) => {
-  let ancestorId = getTask(taskId).parent;
-  while (ancestorId !== null) {
-    if (ancestorId === queryTaskId) return true;
-    ancestorId = getTask(ancestorId).parent;
-  }
-  return false;
-};
-
-const isDescendant = (queryTaskId, taskId) => isAncestor(taskId, queryTaskId);
-
-const isRequirement = (queryTaskId, taskId) => {
-  for (const requirementId of getTask(taskId).requirements) {
-    if (queryTaskId === requirementId) return true;
-  }
-  return false;
-};
-
-const isDependent = (queryTaskId, taskId) => isRequirement(taskId, queryTaskId);
-
-const arbitraryMatch = function(searchSequence, targetSequence) {
-  for (const searchWord of searchSequence) {
-    if (!targetSequence.some(
-      targetWord => matchTerm(searchWord, targetWord)
-    )) {
-      return false;
-    }
-  }
-  return true;
-};
-
+// edit panel requirements
 const addRequirementOnSearch = searchText => {
   if (searchText === '') {
     addRequirementOptions.value = [];
@@ -603,6 +636,35 @@ const addRequirementOnSearch = searchText => {
   );
 };
 
+const addRequirementClearValue = () => {
+  addRequirementValue.value = '';
+  addRequirementOptions.value = [];
+};
+
+const addRequirementOnSelect = (value, option) => {
+  if ('value' in option) {
+    const requirement = getTaskFromDescriptionWithId(option.value);
+    // skip checks
+    requirements.value.push(requirement.id);
+    updateTask(editId.value, { requirements: requirements.value });
+    requirement.dependents.push(editId.value);
+    updateTask(requirement.id, { dependents: requirement.dependents });
+  }
+  addRequirementClearValue();
+};
+
+const deleteRequirementOnClick = id => {
+  // skip checks
+  // todo: fix flicker (debounce rerendering?)
+  requirements.value = requirements.value.filter(taskId => taskId !== id);
+  updateTask(editId.value, { requirements: requirements.value });
+  getTask(id).dependents = getTask(id).dependents.filter(taskId => taskId !== editId.value);
+  updateTask(id, { dependents: getTask(id).dependents });
+
+  dummyEditInput.value.focus();
+};
+
+// edit panel dependents
 const addDependentOnSearch = searchText => {
   if (searchText === '') {
     addDependentOptions.value = [];
@@ -628,26 +690,9 @@ const addDependentOnSearch = searchText => {
   );
 };
 
-const addRequirementClearValue = () => {
-  addRequirementValue.value = '';
-  addRequirementOptions.value = [];
-};
-
 const addDependentClearValue = () => {
   addDependentValue.value = '';
   addDependentOptions.value = [];
-};
-
-const addRequirementOnSelect = (value, option) => {
-  if ('value' in option) {
-    const requirement = getTaskFromDescriptionWithId(option.value);
-    // skip checks
-    requirements.value.push(requirement.id);
-    updateTask(editId.value, { requirements: requirements.value });
-    requirement.dependents.push(editId.value);
-    updateTask(requirement.id, { dependents: requirement.dependents });
-  }
-  addRequirementClearValue();
 };
 
 const addDependentOnSelect = (value, option) => {
@@ -662,17 +707,6 @@ const addDependentOnSelect = (value, option) => {
   addDependentClearValue();
 };
 
-const deleteRequirementOnClick = id => {
-  // skip checks
-  // todo: fix flicker (debounce rerendering?)
-  requirements.value = requirements.value.filter(taskId => taskId !== id);
-  updateTask(editId.value, { requirements: requirements.value });
-  getTask(id).dependents = getTask(id).dependents.filter(taskId => taskId !== editId.value);
-  updateTask(id, { dependents: getTask(id).dependents });
-
-  dummyEditInput.value.focus();
-};
-
 const deleteDependentOnClick = id => {
   // skip checks
   // todo: fix flicker
@@ -684,6 +718,7 @@ const deleteDependentOnClick = id => {
   dummyEditInput.value.focus();
 };
 
+// edit panel parent
 const setParentOnSearch = searchText => {
   if (searchText === '') {
     setParentOptions.value = [];
@@ -737,6 +772,7 @@ const deleteParentOnClick = () => {
   dummyEditInput.value.focus();
 };
 
+// edit panel subtasks
 const addSubtaskOnSearch = searchText => {
   if (searchText === '') {
     addSubtaskOptions.value = [];
@@ -789,74 +825,83 @@ const deleteSubtaskOnClick = id => {
   dummyEditInput.value.focus();
 };
 
-const finishTaskIfCompleted = async task => {
-  // autocomplete only works on parent tasks
-  if (task.finished || !isParent(task)) return false;
-  
-  if (requirementsFinished(task) && subtasksFinished(task)) {
-    await finishTask(task.id);
-    return true;
-  }
-  return false;
-};
 
-const finishTask = id => {
-  const timeFinished = Date.now();
-  const task = getTask(id);
-  task.pinned = false;
-  task.finished = true;
-  task.timeFinished = timeFinished;
-  updateDisplayedTasks();
-
-  updateTask(id, {
-    pinned: false,
-    finished: true,
-    timeFinished: timeFinished,
-  });
-};
-
-const deleteTask = id => {
-  const task = getTask(id);
-  task.pinned = false;
-  task.deleted = true;
-  updateTask(id, { pinned: false, deleted: true });
-  if (editId.value === id) editId.value = null;
-};
-
-const pinTask = taskId => {
-  getTask(taskId).pinned = true;
-  updateTask(taskId, { pinned: true });
-  updateDisplayedTasks();
-};
-
-const unpinTask = taskId => {
-  getTask(taskId).pinned = false;
-  updateTask(taskId, { pinned: false });
-  updateDisplayedTasks();
-};
-
+// import tasks
 const importTasksOnChange = async (event) => {
   const file = event.target.files.item(0);
-  const content = await file.text();
-  const importedTasks = JSON.parse(content);
-  // todo: validity checks?
-  const idOffset = tasks.value.length;
-  importedTasks.forEach(task => {
-    task.id += idOffset;
-  });
-  blockTasksOnUpdate.value = true;
-  for (const task of importedTasks) {
-    await addTask(task);
-  }
-  blockTasksOnUpdate.value = false;
-  tasksOnUpdate();
+  importTasks(file);
 };
 
-const exportTasks = () => {
-  const data = JSON.stringify(tasks.value, null, 2);
-  const blob = new Blob([data], { type: 'application/json' });
-  saveAs(blob, 'gtodo-tasks.json');
-};
+// export tasks
+const exportTasksOnClick = exportTasks;
+
+
+
+onMounted(() => {
+
+  // register listeners
+  register({
+    tasks: {
+      target: tasks,
+      after: () => {
+        tasksOnUpdate();
+        updateDisplayedTasks();
+      },
+    },
+    persisted: { target: persisted, after: updateDisplayedTasks },
+  });
+
+  // global escape listener
+  // activate only when modal is not displayed and
+  // filter tag input dropdown is not visible
+  window.addEventListener('keydown', (e) => {
+
+    if (e.key === 'Escape') {
+
+      if (displayEditPanel.value) {
+
+        // same hack as filter tag (see below)
+        addTagEscapeCount.value += 1;
+        if (addTagHasFocus.value && addTagEscapeCount.value < 2) return;
+
+        displayEditPanel.value = false;
+
+      } else if (addFilterTagHasFocus.value) {
+
+        // first escape closes the dropdown
+        // using dropdownVisibleChange listener doesnt help
+        // since variable visible changes to false
+        // before escape listener is invoked
+        // thus this hacky solution with an escape counter
+        // todo: ...can this be solved with the open prop?
+        // 
+        // known issue:
+        // still need 2 escape presses after deleting tags
+        // while dropdown is not visible
+
+        addFilterTagEscapeCount.value += 1;
+        if (addFilterTagEscapeCount.value >= 2) {
+          filterTags.value = [];
+          updateDisplayedTasks();
+        }
+
+      // clear todo bar if not empty
+      } else if (promptValue.value !== '') {
+
+        promptValue.value = '';
+        updateDisplayedTasks();
+
+      // clear filter tags if todo bar empty
+      } else if (filterTags.value.length !== 0) {
+
+        filterTags.value = [];
+        updateDisplayedTasks();
+
+      }
+    }
+  });
+
+});
 </script>
 
 <template>
@@ -917,7 +962,7 @@ const exportTasks = () => {
 
     <Modal
       v-if="editId !== null && editId.value !== null"
-      v-model:open="displayEdit"
+      v-model:open="displayEditPanel"
       :keyboard="false"
     >
       <!-- https://github.com/vuejs/vue/issues/6929#issuecomment-1952352146 -->
@@ -946,7 +991,7 @@ const exportTasks = () => {
           <span
             v-else
             style="font-weight: bold; font-size: 20px;"
-            @click="modalDescriptionOnClick"
+            @click="editDescriptionOnClick"
           >
             {{ getTask(editId).description }}
           </span>
@@ -972,7 +1017,7 @@ const exportTasks = () => {
           </h4>
 
           <Select
-            v-model:value="modalTags"
+            v-model:value="editTags"
             mode="tags"
             style="width: 100%;"
             placeholder="add tag..."
@@ -1286,7 +1331,7 @@ const exportTasks = () => {
 
         <export-outlined
           class="clickable-icon"
-          @click="exportTasks"
+          @click="exportTasksOnClick"
         />
       </Space>
 
