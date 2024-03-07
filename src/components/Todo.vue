@@ -622,12 +622,6 @@ const addTagOnBlur = () => {
   addTagHasFocus.value = false;
 }
 
-const getTaskFromDescriptionWithId = description => {
-  const descriptionSplit = description.split('#');
-  const id = parseInt(descriptionSplit[descriptionSplit.length - 1]);
-  return getTask(id);
-};
-
 const getDescriptionWithId = task => `${task.description} #${task.id}`;
 
 // edit panel requirements
