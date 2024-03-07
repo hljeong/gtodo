@@ -354,6 +354,30 @@ const arbitraryMatch = (searchSequence, targetSequence) => {
   return true;
 };
 
+const searchTasks = (searchText, options, filter) => {
+  const searchSequence = searchText.trim().split(' ');
+
+  const sortedTasks = tasks.value.filter((task) => !task.deleted);
+  // todo: use relevance
+  sortedTasks.sort(taskComparator);
+
+  const taskOptions = sortedTasks.map(task => {
+    return {
+      id: task.id,
+      value: getDescriptionWithId(task),
+    };
+  });
+  options.value = taskOptions.filter(
+    option => (
+      arbitraryMatch(
+        searchSequence,
+        option.value.split(' ')
+      ) &&
+      filter(getTask(option.id))
+    )
+  );
+};
+
 const searchTags = (searchText, options, tags) => {
   const searchSequence = searchText.trim().split(' ');
 
@@ -406,19 +430,15 @@ const orderTags = (tags) => [
   ),
 ];
 
-const orderTasks = () => {
-  // reversed chronological for now
-  // todo: reorder according to policy
-  displayedTasks.value.sort((task1, task2) => task2.timeCreated - task1.timeCreated);
-
-  const displayedPinnedTasks = displayedTasks.value.filter(
-    task => task.pinned
-  );
-  const displayedUnpinnedTasks = displayedTasks.value.filter(
-    task => !task.pinned
-  );
-  displayedTasks.value = displayedPinnedTasks;
-  displayedTasks.value.push(...displayedUnpinnedTasks);
+// reversed chronological for now
+const taskComparator = (task1, task2) => {
+  if (task1.pinned === task2.pinned) {
+    return task2.timeCreated - task1.timeCreated;
+  } else if (task1.pinned) {
+    return -1;
+  } else {
+    return 1;
+  }
 };
 
 
@@ -441,7 +461,7 @@ const tasksOnUpdate = () => {
 
 const updateDisplayedTasks = () => {
   filterTasks();
-  orderTasks();
+  displayedTasks.value.sort(taskComparator);
 };
 
 const updateAllTags = () => {
@@ -616,23 +636,14 @@ const addRequirementOnSearch = searchText => {
     addRequirementOptions.value = [];
     return;
   }
-  const options = unfinishedTasks.value.map(task => {
-    return {
-      id: task.id,
-      value: getDescriptionWithId(task),
-    };
-  });
-  const searchSequence = searchText.trim().split(' ');
-  addRequirementOptions.value = options.filter(
-    option => (
-      arbitraryMatch(
-        searchSequence,
-        option.value.split(' ')
-      ) && 
-      editId.value !== option.id && 
-      !isRequirement(editId.value, option.id) && 
-      !isDependent(editId.value, option.id)
-    )
+  searchTasks(
+    searchText,
+    addRequirementOptions,
+    (task) =>
+      !task.finished &&
+      editId.value !== task.id &&
+      !isRequirement(editId.value, task.id) &&
+      !isDependent(editId.value, task.id)
   );
 };
 
@@ -643,7 +654,7 @@ const addRequirementClearValue = () => {
 
 const addRequirementOnSelect = (value, option) => {
   if ('value' in option) {
-    const requirement = getTaskFromDescriptionWithId(option.value);
+    const requirement = getTask(option.id);
     // skip checks
     requirementIds.value.push(requirement.id);
     updateTask(editId.value, { requirementIds: requirementIds.value });
@@ -670,23 +681,14 @@ const addDependentOnSearch = searchText => {
     addDependentOptions.value = [];
     return;
   }
-  const options = unfinishedTasks.value.map(task => {
-    return {
-      id: task.id,
-      value: getDescriptionWithId(task),
-    };
-  });
-  const searchSequence = searchText.trim().split(' ');
-  addDependentOptions.value = options.filter(
-    option => (
-      arbitraryMatch(
-        searchSequence,
-        option.value.split(' ')
-      ) && 
-      editId.value !== option.id && 
-      !isRequirement(editId.value, option.id) && 
-      !isDependent(editId.value, option.id)
-    )
+  searchTasks(
+    searchText,
+    addDependentOptions,
+    (task) =>
+      !task.finished &&
+      editId.value !== task.id &&
+      !isRequirement(editId.value, task.id) &&
+      !isDependent(editId.value, task.id)
   );
 };
 
@@ -697,7 +699,7 @@ const addDependentClearValue = () => {
 
 const addDependentOnSelect = (value, option) => {
   if ('value' in option) {
-    const dependent = getTaskFromDescriptionWithId(option.value);
+    const dependent = getTask(option.id);
     // skip checks
     dependentIds.value.push(dependent.id);
     updateTask(editId.value, { dependentIds: dependentIds.value });
@@ -719,29 +721,20 @@ const deleteDependentOnClick = id => {
 };
 
 // edit panel parent
-const setParentOnSearch = searchText => {
+const setParentOnSearch = (searchText) => {
   if (searchText === '') {
     setParentOptions.value = [];
     return;
   }
-  const options = unfinishedTasks.value.map(task => {
-    return {
-      id: task.id,
-      value: getDescriptionWithId(task),
-    };
-  });
-  const searchSequence = searchText.trim().split(' ');
-  setParentOptions.value = options.filter(
-    option => (
-      arbitraryMatch(
-        searchSequence,
-        option.value.split(' ')
-      ) && 
-      editId.value !== option.id && 
-      !isDescendant(option.id, editId.value) &&
-      !isRequirement(option.id, editId.value)
-    )
-  );
+  searchTasks(
+    searchText,
+    setParentOptions,
+    (task) =>
+      !task.finished &&
+      editId.value !== task.id &&
+      !isDescendant(task.id, editId.value) &&
+      !isRequirement(task.id, editId.value)
+  )
 };
 
 const setParentClearValue = () => {
@@ -751,7 +744,7 @@ const setParentClearValue = () => {
 
 const setParentOnSelect = (value, option) => {
   if ('value' in option) {
-    const parent = getTaskFromDescriptionWithId(option.value);
+    const parent = getTask(option.id);
     // skip checks
     getTask(editId.value).parentId = parent.id;
     updateTask(editId.value, { parentId: parent.id });
@@ -778,23 +771,14 @@ const addSubtaskOnSearch = searchText => {
     addSubtaskOptions.value = [];
     return;
   }
-  const options = unfinishedTasks.value.map(task => {
-    return {
-      id: task.id,
-      value: getDescriptionWithId(task),
-    };
-  });
-  const searchSequence = searchText.trim().split(' ');
-  addSubtaskOptions.value = options.filter(
-    option => (
-      arbitraryMatch(
-        searchSequence,
-        option.value.split(' ')
-      ) && 
-      editId.value !== option.id && 
-      !isAncestor(option.id, editId.value) && 
-      getTask(option.id).parentId === null
-    )
+  searchTasks(
+    searchText,
+    addSubtaskOptions,
+    (task) =>
+      !task.finished &&
+      editId.value !== task.id && 
+      !isAncestor(task.id, editId.value) && 
+      task.parentId === null
   );
 };
 
@@ -805,8 +789,7 @@ const addSubtaskClearValue = () => {
 
 const addSubtaskOnSelect = (value, option) => {
   if ('value' in option) {
-    // todo: use option.id?
-    const subtask = getTaskFromDescriptionWithId(option.value);
+    const subtask = getTask(option.id);
     // skip checks
     subtaskIds.value.push(subtask.id);
     updateTask(editId.value, { subtaskIds: subtaskIds.value });
