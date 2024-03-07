@@ -113,10 +113,6 @@ const syncTaskSchema = async (user) => {
     for (const property in taskSchema) {
       syncedTask[property] = property in task ? task[property] : taskSchema[property]();
     }
-    syncedTask.requirementIds = task.requirements.slice();
-    syncedTask.dependentIds = task.dependents.slice();
-    syncedTask.parentId = task.parent;
-    syncedTask.subtaskIds = task.subtasks.slice();
     if (needsUpdate(task, syncedTask)) {
       debug(`task #${task.id} schema out of sync, syncing...`);
       await setDoc(getTaskRef(task.id), syncedTask);
