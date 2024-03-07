@@ -18,6 +18,7 @@ VITE_FIREBASE_STORAGE_BUCKET='<firebase storage bucket>'
 VITE_FIREBASE_MESSAGING_SENDER_ID='<firebase messaging sender id>'
 VITE_FIREBASE_APP_ID='<firebase app id>'
 VITE_FIREBASE_DATABASE='<firestore collection>'
+VITE_DEBUG='false'
 ```
 
 ## run development server

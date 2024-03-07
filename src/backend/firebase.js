@@ -1,13 +1,8 @@
 import { initializeApp } from 'firebase/app';
 import {
-  getFirestore,
-  collection,
-  doc,
-  getDoc,
-  getDocs,
-  setDoc,
-  deleteDoc,
-  onSnapshot,
+  getFirestore, collection,
+  doc, getDoc, getDocs,
+  setDoc, deleteDoc, onSnapshot,
   getCountFromServer,
 } from 'firebase/firestore';
 import {
@@ -17,13 +12,26 @@ import {
   signInWithPopup,
 } from 'firebase/auth';
 
+const apiKey = import.meta.env.VITE_FIREBASE_API_KEY;
+const authDomain = import.meta.env.VITE_FIREBASE_AUTH_DOMAIN;
+const projectId = import.meta.env.VITE_FIREBASE_PROJECT_ID;
+const storageBucket = import.meta.env.VITE_FIREBASE_STORAGE_BUCKET;
+const messagingSenderId = import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID;
+const appId = import.meta.env.VITE_FIREBASE_APP_ID;
+const databaseName = import.meta.env.VITE_FIREBASE_DATABASE;
+const debugMode = import.meta.env.VITE_DEBUG === 'true';
+
+const debug = debugMode ?
+  (msg) => console.log(msg) :
+  () => null;
+
 export const firebaseApp = initializeApp({
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
-  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
-  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
-  appId: import.meta.env.VITE_FIREBASE_APP_ID,
+  apiKey: apiKey,
+  authDomain: authDomain,
+  projectId: projectId,
+  storageBucket: storageBucket,
+  messagingSenderId: messagingSenderId,
+  appId: appId,
 });
 
 const auth = getAuth(firebaseApp);
@@ -31,19 +39,28 @@ export let userUid = 'default';
 
 const db = getFirestore(firebaseApp);
 const getTasksRef = (userUid) => collection(
-  db,
-  import.meta.env.VITE_FIREBASE_DATABASE,
-  userUid,
-  'tasks'
+  db, databaseName, userUid, 'tasks'
 );
 const getPersistedRef = (userUid) => collection(
-  db,
-  import.meta.env.VITE_FIREBASE_DATABASE,
-  userUid,
-  'persisted'
+  db, databaseName, userUid, 'persisted'
 );
+
 let tasksRef = getTasksRef(userUid);
 let persistedRef = getPersistedRef(userUid);
+
+const taskSchema = {
+  description: () => '',
+  finished: () => false,
+  pinned: () => false,
+  deleted: () => false,
+  timeCreated: () => null,
+  timeFinished: () => null,
+  tags: () => [],
+  requirementIds: () => [],
+  dependentIds: () => [],
+  parentId: () => null,
+  subtaskIds: () => [],
+};
 
 const settingsSchema = {
   showTags: () => true,
@@ -74,21 +91,6 @@ export const signIn = async () => {
   }
 };
 
-// todo: add 'id's back
-const taskSchema = {
-  description: () => '',
-  finished: () => false,
-  pinned: () => false,
-  deleted: () => false,
-  timeCreated: () => null,
-  timeFinished: () => null,
-  tags: () => [],
-  requirements: () => [],
-  dependents: () => [],
-  parent: () => null,
-  subtasks: () => [],
-};
-
 const getTaskRef = (id) => doc(tasksRef, id.toString());
 
 const getSettingsRef = () => doc(persistedRef, 'settings');
@@ -111,10 +113,14 @@ const syncTaskSchema = async (user) => {
     for (const property in taskSchema) {
       syncedTask[property] = property in task ? task[property] : taskSchema[property]();
     }
+    syncedTask.requirementIds = task.requirements.slice();
+    syncedTask.dependentIds = task.dependents.slice();
+    syncedTask.parentId = task.parent;
+    syncedTask.subtaskIds = task.subtasks.slice();
     if (needsUpdate(task, syncedTask)) {
-      console.log(`task #${task.id} schema out of sync, syncing...`);
+      debug(`task #${task.id} schema out of sync, syncing...`);
       await setDoc(getTaskRef(task.id), syncedTask);
-      console.log(`task #${task.id} schema synced`)
+      debug(`task #${task.id} schema synced`)
     }
   }
 };
@@ -128,9 +134,9 @@ const syncSettingsSchema = async (user) => {
     syncedSettings[setting] = setting in settings ? settings[setting] : settingsSchema[setting]();
   }
   if (needsUpdate(settings, syncedSettings)) {
-    console.log(`settings schema out of sync, syncing...`);
+    debug(`settings schema out of sync, syncing...`);
     await setDoc(settingsRef, syncedSettings);
-      console.log(`settings schema synced`)
+    debug(`settings schema synced`)
   }
 };
 

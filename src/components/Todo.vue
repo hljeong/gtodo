@@ -91,13 +91,13 @@ const addTagHasFocus = ref(false);
 const addTagEscapeCount = ref(0);
 
 // requirements
-const requirements = ref([]);
+const requirementIds = ref([]);
 const addRequirementOptions = ref([]);
 const addRequirementValue = ref('');
 const addRequirementInput = ref(null);
 
 // dependents
-const dependents = ref([]);
+const dependentIds = ref([]);
 const addDependentOptions = ref([]);
 const addDependentValue = ref('');
 const addDependentInput = ref(null);
@@ -108,7 +108,7 @@ const setParentValue = ref('');
 const setParentInput = ref(null);
 
 // subtasks
-const subtasks = ref([]);
+const subtaskIds = ref([]);
 const addSubtaskOptions = ref([]);
 const addSubtaskValue = ref('');
 const addSubtaskInput = ref(null);
@@ -118,15 +118,15 @@ const addSubtaskInput = ref(null);
 // tasks
 const getTask = (id) => taskIndex.value[id];
 
-const isParent = task => task.subtasks.length !== 0;
+const isParent = task => task.subtaskIds.length !== 0;
 
-const isBlocked = (task) => task.requirements.some(
+const isBlocked = (task) => task.requirementIds.some(
   (requirementId) => !getTask(requirementId).finished
 );
 
 const isntBlocked = (task) => !isBlocked(task);
 
-const isCompleted = task => task.subtasks.every(
+const isCompleted = (task) => task.subtaskIds.every(
   (subtaskId) => getTask(subtaskId).finished
 );
 
@@ -140,7 +140,7 @@ const indexTasks = () => {
 const isDescendant = (queryTaskId, taskId) => isAncestor(taskId, queryTaskId);
 
 const isRequirement = (queryTaskId, taskId) => {
-  for (const requirementId of getTask(taskId).requirements) {
+  for (const requirementId of getTask(taskId).requirementIds) {
     if (queryTaskId === requirementId) return true;
   }
   return false;
@@ -149,10 +149,10 @@ const isRequirement = (queryTaskId, taskId) => {
 const isDependent = (queryTaskId, taskId) => isRequirement(taskId, queryTaskId);
 
 const isAncestor = (queryTaskId, taskId) => {
-  let ancestorId = getTask(taskId).parent;
+  let ancestorId = getTask(taskId).parentId;
   while (ancestorId !== null) {
     if (ancestorId === queryTaskId) return true;
-    ancestorId = getTask(ancestorId).parent;
+    ancestorId = getTask(ancestorId).parentId;
   }
   return false;
 };
@@ -287,8 +287,8 @@ const getTagTargetSequence = (tag) => [
 const getTaskTargetSequence = (id) => {
   const pathFromRoot = [getTask(id)];
   if (persisted.value.settings.searchSubtasks) {
-    while (pathFromRoot[0].parent !== null) {
-      pathFromRoot.unshift(getTask(pathFromRoot[0].parent));
+    while (pathFromRoot[0].parentId !== null) {
+      pathFromRoot.unshift(getTask(pathFromRoot[0].parentId));
     }
   }
   const targetSequence = [].concat(...pathFromRoot.map(
@@ -343,10 +343,10 @@ const filterTasks = () => {
   }
 };
 
-const arbitraryMatch = function(searchSequence, targetSequence) {
+const arbitraryMatch = (searchSequence, targetSequence) => {
   for (const searchWord of searchSequence) {
     if (!targetSequence.some(
-      targetWord => matchTerm(searchWord, targetWord)
+      (targetWord) => matchTerm(searchWord, targetWord)
     )) {
       return false;
     }
@@ -434,8 +434,8 @@ const tasksOnUpdate = () => {
   updateAllTags();
   if (editId.value !== null) {
     const task = getTask(editId.value);
-    requirements.value = task.requirements;
-    dependents.value = task.dependents;
+    requirementIds.value = task.requirementIds;
+    dependentIds.value = task.dependentIds;
   }
 };
 
@@ -526,18 +526,18 @@ const showEdit = (id) => {
     tag => !task.tags.includes(tag.value)
   );
 
-  requirements.value = task.requirements;
+  requirementIds.value = task.requirementIds;
   addRequirementOptions.value = [];
   addRequirementValue.value = '';
 
-  dependents.value = task.dependents;
+  dependentIds.value = task.dependentIds;
   addDependentOptions.value = [];
   addDependentValue.value = '';
 
   setParentOptions.value = [];
   setParentValue.value = '';
 
-  subtasks.value = task.subtasks;
+  subtaskIds.value = task.subtaskIds;
   addSubtaskOptions.value = [];
   addSubtaskValue.value = '';
   
@@ -645,10 +645,10 @@ const addRequirementOnSelect = (value, option) => {
   if ('value' in option) {
     const requirement = getTaskFromDescriptionWithId(option.value);
     // skip checks
-    requirements.value.push(requirement.id);
-    updateTask(editId.value, { requirements: requirements.value });
-    requirement.dependents.push(editId.value);
-    updateTask(requirement.id, { dependents: requirement.dependents });
+    requirementIds.value.push(requirement.id);
+    updateTask(editId.value, { requirementIds: requirementIds.value });
+    requirement.dependentIds.push(editId.value);
+    updateTask(requirement.id, { dependentIds: requirement.dependentIds });
   }
   addRequirementClearValue();
 };
@@ -656,10 +656,10 @@ const addRequirementOnSelect = (value, option) => {
 const deleteRequirementOnClick = id => {
   // skip checks
   // todo: fix flicker (debounce rerendering?)
-  requirements.value = requirements.value.filter(taskId => taskId !== id);
-  updateTask(editId.value, { requirements: requirements.value });
-  getTask(id).dependents = getTask(id).dependents.filter(taskId => taskId !== editId.value);
-  updateTask(id, { dependents: getTask(id).dependents });
+  requirementIds.value = requirementIds.value.filter(taskId => taskId !== id);
+  updateTask(editId.value, { requirementIds: requirementIds.value });
+  getTask(id).dependentIds = getTask(id).dependentIds.filter(taskId => taskId !== editId.value);
+  updateTask(id, { dependentIds: getTask(id).dependentIds });
 
   dummyEditInput.value.focus();
 };
@@ -699,10 +699,10 @@ const addDependentOnSelect = (value, option) => {
   if ('value' in option) {
     const dependent = getTaskFromDescriptionWithId(option.value);
     // skip checks
-    dependents.value.push(dependent.id);
-    updateTask(editId.value, { dependents: dependents.value });
-    dependent.requirements.push(editId.value);
-    updateTask(dependent.id, { requirements: dependent.requirements });
+    dependentIds.value.push(dependent.id);
+    updateTask(editId.value, { dependentIds: dependentIds.value });
+    dependent.requirementIds.push(editId.value);
+    updateTask(dependent.id, { requirementIds: dependent.requirementIds });
   }
   addDependentClearValue();
 };
@@ -710,10 +710,10 @@ const addDependentOnSelect = (value, option) => {
 const deleteDependentOnClick = id => {
   // skip checks
   // todo: fix flicker
-  dependents.value = dependents.value.filter(taskId => taskId !== id);
-  updateTask(editId.value, { dependents: dependents.value });
-  getTask(id).requirements = getTask(id).requirements.filter(taskId => taskId !== editId.value);
-  updateTask(id, { requirements: getTask(id).requirements });
+  dependentIds.value = dependentIds.value.filter(taskId => taskId !== id);
+  updateTask(editId.value, { dependentIds: dependentIds.value });
+  getTask(id).requirementIds = getTask(id).requirementIds.filter(taskId => taskId !== editId.value);
+  updateTask(id, { requirementIds: getTask(id).requirementIds });
 
   dummyEditInput.value.focus();
 };
@@ -753,22 +753,22 @@ const setParentOnSelect = (value, option) => {
   if ('value' in option) {
     const parent = getTaskFromDescriptionWithId(option.value);
     // skip checks
-    getTask(editId.value).parent = parent.id;
-    updateTask(editId.value, { parent: parent.id });
-    parent.subtasks.push(editId.value);
-    updateTask(parent.id, { subtasks: parent.subtasks });
+    getTask(editId.value).parentId = parent.id;
+    updateTask(editId.value, { parentId: parent.id });
+    parent.subtaskIds.push(editId.value);
+    updateTask(parent.id, { subtaskIds: parent.subtaskIds });
   }
   setParentClearValue();
   dummyEditInput.value.focus();
 };
 
 const deleteParentOnClick = () => {
-  const parent = getTask(getTask(editId.value).parent);
+  const parent = getTask(getTask(editId.value).parentId);
   // skip checks
-  getTask(editId.value).parent = null;
-  updateTask(editId.value, { parent: null });
-  parent.subtasks = parent.subtasks.filter(subtaskId => subtaskId !== editId.value);
-  updateTask(parent.id, { subtasks: parent.subtasks });
+  getTask(editId.value).parentId = null;
+  updateTask(editId.value, { parentId: null });
+  parent.subtaskIds = parent.subtaskIds.filter(subtaskId => subtaskId !== editId.value);
+  updateTask(parent.id, { subtaskIds: parent.subtaskIds });
   dummyEditInput.value.focus();
 };
 
@@ -793,7 +793,7 @@ const addSubtaskOnSearch = searchText => {
       ) && 
       editId.value !== option.id && 
       !isAncestor(option.id, editId.value) && 
-      getTask(option.id).parent === null
+      getTask(option.id).parentId === null
     )
   );
 };
@@ -808,20 +808,20 @@ const addSubtaskOnSelect = (value, option) => {
     // todo: use option.id?
     const subtask = getTaskFromDescriptionWithId(option.value);
     // skip checks
-    subtasks.value.push(subtask.id);
-    updateTask(editId.value, { subtasks: subtasks.value });
-    subtask.parent = editId.value;
-    updateTask(subtask.id, { parent: editId.value });
+    subtaskIds.value.push(subtask.id);
+    updateTask(editId.value, { subtaskIds: subtaskIds.value });
+    subtask.parentId = editId.value;
+    updateTask(subtask.id, { parentId: editId.value });
   }
   addSubtaskClearValue();
 };
 
 const deleteSubtaskOnClick = id => {
   const subtask = getTask(id);
-  subtasks.value = subtasks.value.filter(taskId => taskId !== id);
-  updateTask(editId.value, { subtasks: subtasks.value });
-  subtask.parent = null;
-  updateTask(subtask.id, { parent: null });
+  subtaskIds.value = subtaskIds.value.filter(taskId => taskId !== id);
+  updateTask(editId.value, { subtaskIds: subtaskIds.value });
+  subtask.parentId = null;
+  updateTask(subtask.id, { parentId: null });
   dummyEditInput.value.focus();
 };
 
@@ -1048,7 +1048,7 @@ onMounted(() => {
 
           <template
             v-if="editId !== null"
-            v-for="taskId of requirements"
+            v-for="taskId of requirementIds"
           >
             <div
               class="
@@ -1109,7 +1109,7 @@ onMounted(() => {
 
           <template
             v-if="editId !== null"
-            v-for="taskId of dependents"
+            v-for="taskId of dependentIds"
           >
             <div
               class="
@@ -1171,7 +1171,7 @@ onMounted(() => {
           </h4>
 
           <div
-            v-if="editId !== null && getTask(editId).parent !== null"
+            v-if="editId !== null && getTask(editId).parentId !== null"
             class="
               child-show-on-hover
               rounded-corners
@@ -1185,8 +1185,8 @@ onMounted(() => {
             "
           >
             <p>
-              <span>{{ getTask(getTask(editId).parent).description }}</span>
-              <span style="color: #666;"> #{{ getTask(getTask(editId).parent).id }}</span>
+              <span>{{ getTask(getTask(editId).parentId).description }}</span>
+              <span style="color: #666;"> #{{ getTask(editId).parentId }}</span>
             </p>
 
             <div style="flex: 1;">
@@ -1231,7 +1231,7 @@ onMounted(() => {
 
           <template
             v-if="editId !== null"
-            v-for="taskId of subtasks"
+            v-for="taskId of subtaskIds"
           >
             <div
               class="
