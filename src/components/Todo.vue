@@ -1039,6 +1039,11 @@ onMounted(() => {
                 align-items: center;
               "
             >
+              <check-outlined
+                v-if="getTask(taskId).finished"
+                class="dependency-list-icon"
+                style="padding-right: 6px;"
+              />
               <p>
                 <span>{{ getTask(taskId).description }}</span>
                 <span style="color: #666;"> #{{ getTask(taskId).id }}</span>
@@ -1222,6 +1227,11 @@ onMounted(() => {
                 align-items: center;
               "
             >
+              <check-outlined
+                v-if="getTask(taskId).finished"
+                class="dependency-list-icon"
+                style="padding-right: 6px;"
+              />
               <p>
                 <span>{{ getTask(taskId).description }}</span>
                 <span style="color: #666;"> #{{ getTask(taskId).id }}</span>
@@ -1534,6 +1544,15 @@ onMounted(() => {
 .child-show-on-hover:hover .show-on-hover-7 {
   opacity: 100%;
   transition: opacity 2.1s ease;
+}
+
+.dependency-list-icon {
+  font-size: 0.85rem;
+  /* padding-top: 6px; */
+}
+
+.hide {
+  opacity: 0%;
 }
 
 </style>
